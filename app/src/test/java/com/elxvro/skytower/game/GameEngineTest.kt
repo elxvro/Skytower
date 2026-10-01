@@ -86,13 +86,26 @@ class GameEngineTest {
     }
 
     @Test
-    fun largeDeltaIsClamped() {
-        val engine = engine()
-        engine.start()
-        val moving = engine.movingBlock!!
-        moving.x = 100f
-        val before = moving.x
-        engine.update(10f)
-        assertTrue(moving.x - before <= DifficultyCurve.speedForScore(0) * GameEngine.MAX_DELTA_SECONDS + 0.01f)
+    fun lowFpsFrameMatchesEquivalentSmallPhysicsSteps() {
+        val lowFps = engine().also { it.start(); it.movingBlock!!.x = 300f }
+        val normal = engine().also { it.start(); it.movingBlock!!.x = 300f }
+
+        lowFps.update(0.15f)
+        repeat(3) { normal.update(0.05f) }
+
+        assertEquals(normal.movingBlock!!.x, lowFps.movingBlock!!.x, 0.001f)
+        assertEquals(normal.movementDirection, lowFps.movementDirection, 0.001f)
+    }
+
+    @Test
+    fun hugeFrameIsCappedAtRecoveryWindow() {
+        val hugeFrame = engine().also { it.start(); it.movingBlock!!.x = 300f }
+        val capped = engine().also { it.start(); it.movingBlock!!.x = 300f }
+
+        hugeFrame.update(10f)
+        repeat(4) { capped.update(0.05f) }
+
+        assertEquals(capped.movingBlock!!.x, hugeFrame.movingBlock!!.x, 0.001f)
+        assertEquals(capped.movementDirection, hugeFrame.movementDirection, 0.001f)
     }
 }
