@@ -16,6 +16,6 @@ class RunRewardRulesTest {
     @Test fun missionStreakAndLevelRewardsAreNotMultiplied() {
         val result = RunRewardRules.calculate(runCoins = 5, missionCoins = 40, streakCoins = 150, levelCoins = 125, coinMultiplier = true)
         assertEquals(10, result.runCoins)
-        assertEquals(315, result.totalCoins)
+        assertEquals(325, result.totalCoins)
     }
 }
