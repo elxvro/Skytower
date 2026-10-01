@@ -3,6 +3,16 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+val signingStorePath = providers.environmentVariable("SKYTOWER_KEYSTORE_PATH").orNull
+val signingStorePassword = providers.environmentVariable("SKYTOWER_KEYSTORE_PASSWORD").orNull
+val signingKeyAlias = providers.environmentVariable("SKYTOWER_KEY_ALIAS").orNull
+val signingKeyPassword = providers.environmentVariable("SKYTOWER_KEY_PASSWORD").orNull
+val hasReleaseSigning = !signingStorePath.isNullOrBlank() &&
+    !signingStorePassword.isNullOrBlank() &&
+    !signingKeyAlias.isNullOrBlank() &&
+    !signingKeyPassword.isNullOrBlank() &&
+    file(signingStorePath!!).exists()
+
 android {
     namespace = "com.elxvro.skytower"
     compileSdk = 36
@@ -15,10 +25,22 @@ android {
         versionName = "0.1.0"
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(signingStorePath!!)
+                storePassword = signingStorePassword
+                keyAlias = signingKeyAlias
+                keyPassword = signingKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfigs.findByName("release")?.let { signingConfig = it }
         }
     }
 
