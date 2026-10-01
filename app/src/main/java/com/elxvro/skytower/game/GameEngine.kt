@@ -11,6 +11,7 @@ class GameEngine(
 ) {
     companion object {
         const val MAX_DELTA_SECONDS = 0.05f
+        private const val MAX_RECOVERY_SECONDS = 0.20f
         private const val DROP_COOLDOWN_SECONDS = 0.12f
     }
 
@@ -63,15 +64,23 @@ class GameEngine(
         if (mode != RunMode.RUNNING) return
 
         val elapsed = deltaSeconds.coerceAtLeast(0f)
-        val dt = elapsed.coerceAtMost(MAX_DELTA_SECONDS)
         if (inputLockRemaining > 0f) {
             inputLockRemaining = max(0f, inputLockRemaining - elapsed)
             inputLocked = inputLockRemaining > 0f
         }
 
+        var remaining = elapsed.coerceAtMost(MAX_RECOVERY_SECONDS)
+        while (remaining > 0f) {
+            val dt = min(remaining, MAX_DELTA_SECONDS)
+            advanceMovement(dt)
+            remaining -= dt
+        }
+    }
+
+    private fun advanceMovement(deltaSeconds: Float) {
         val moving = movingBlock ?: return
         val speed = DifficultyCurve.speedForScore(score)
-        var nextX = moving.x + movementDirection * speed * dt
+        var nextX = moving.x + movementDirection * speed * deltaSeconds
         val minX = leftBound
         val maxX = rightBound.coerceAtLeast(minX)
 
