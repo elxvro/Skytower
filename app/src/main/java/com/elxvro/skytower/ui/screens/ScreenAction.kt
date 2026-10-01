@@ -8,6 +8,8 @@ import com.elxvro.skytower.ui.AppScreen
 sealed interface ScreenAction {
     data object None : ScreenAction
     data object Back : ScreenAction
+    data object ToggleSound : ScreenAction
+    data object ToggleVibration : ScreenAction
     data class Open(val screen: AppScreen) : ScreenAction
     data class Theme(val themeId: Int) : ScreenAction
     data class ClaimDaily(val mission: DailyMission) : ScreenAction
