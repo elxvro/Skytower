@@ -6,18 +6,26 @@ import org.junit.Test
 
 class DifficultyCurveTest {
     @Test
-    fun speedStartsForgivingAndIncreasesWithScore() {
-        assertEquals(220f, DifficultyCurve.speedForScore(0), 0.001f)
-        assertTrue(DifficultyCurve.speedForScore(10) > DifficultyCurve.speedForScore(0))
+    fun earlyGameStartsMoreForgiving() {
+        assertEquals(205f, DifficultyCurve.speedForScore(0), 0.001f)
+        assertEquals(259f, DifficultyCurve.speedForScore(12), 0.001f)
     }
 
     @Test
-    fun speedNeverExceedsCap() {
-        assertEquals(560f, DifficultyCurve.speedForScore(10_000), 0.001f)
+    fun midGameRampsUpWithoutAJump() {
+        val early = DifficultyCurve.speedForScore(12)
+        val mid = DifficultyCurve.speedForScore(35)
+        assertEquals(397f, mid, 0.001f)
+        assertTrue(mid > early)
+    }
+
+    @Test
+    fun lateGameUsesControlledCap() {
+        assertEquals(500f, DifficultyCurve.speedForScore(10_000), 0.001f)
     }
 
     @Test
     fun negativeScoreUsesMinimumSpeed() {
-        assertEquals(220f, DifficultyCurve.speedForScore(-5), 0.001f)
+        assertEquals(205f, DifficultyCurve.speedForScore(-5), 0.001f)
     }
 }
