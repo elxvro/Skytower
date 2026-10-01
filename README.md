@@ -2,21 +2,25 @@
 
 SkyTower, Google Play için geliştirilen çevrimdışı ve tek dokunuşla oynanan 2D kule oyunudur. Hareket eden bloğu kuleye bırak; taşan kısım kesilir, kusursuz hizalamalarda combo artar ve tam kaçırmada oyun biter.
 
-## v0.1 özellikleri
+## v0.2 özellikleri
 
-- Tek dokunuşla blok bırakma.
-- Gerçek overlap/kesme matematiği.
-- Perfect placement ve combo geri bildirimi.
+- Tek dokunuşla blok bırakma ve gerçek overlap/kesme matematiği.
+- İlk oyunda kısa dokunma öğreticisi; tamamlandıktan sonra cihazda hatırlanır.
+- Yumuşak kamera takibi ve kule yükseldikçe parallax gökyüzü/adalar.
+- Blok inişinde squash/pulse animasyonu.
+- Perfect placement için daha güçlü combo yazısı ve parçacık patlaması.
+- Kesilen blok parçalarının düşüş hareketi iyileştirildi.
+- Oyun sonu kartına yumuşak giriş animasyonu ve hızlı retry koruması.
 - Skor ve cihazda kalıcı en iyi skor.
 - Pause, retry ve ana menü akışları.
 - Ses ve titreşim aç/kapat seçenekleri.
 - 3 yerel gökyüzü teması.
-- Procedural bulutlar, uçan adalar ve parlak blok çizimi.
 - İnternet, hesap, reklam ve backend gerektirmez.
 
 ## Android yapılandırması
 
 - Package: `com.elxvro.skytower`
+- Version: `0.2.0` (`versionCode 2`)
 - minSdk: 26
 - compileSdk: 36
 - targetSdk: 36
