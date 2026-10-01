@@ -2,27 +2,38 @@
 
 SkyTower, Google Play için geliştirilen çevrimdışı ve tek dokunuşla oynanan 2D kule oyunudur. Hareket eden bloğu kuleye bırak; taşan kısım kesilir, kusursuz hizalamalarda combo artar ve tam kaçırmada oyun biter.
 
-## v0.3 özellikleri
+## v0.4 özellikleri
 
 - Tek dokunuşla blok bırakma ve gerçek overlap/kesme matematiği.
-- Daha affedici başlangıç hızı ve daha kontrollü kademeli zorluk eğrisi.
-- Düşük FPS anlarında fizik hareketini alt adımlara bölerek daha tutarlı blok hızı.
-- Başarılı yerleştirmelerde skor pulse animasyonu.
-- PERFECT yerleştirmede hafif oyun alanı sarsıntısı; yüksek combo ile kontrollü artış.
+- Daha affedici başlangıç hızı ve kontrollü kademeli zorluk eğrisi.
+- Düşük FPS anlarında 50 ms fizik alt adımlarıyla daha tutarlı blok hareketi.
+- Skor pulse, PERFECT sarsıntısı, combo parçacıkları ve yumuşak kamera/parallax sunumu.
 - İlk oyunda kısa dokunma öğreticisi; tamamlandıktan sonra cihazda hatırlanır.
-- Yumuşak kamera takibi ve kule yükseldikçe parallax gökyüzü/adalar.
-- Blok inişinde squash/pulse animasyonu ve perfect parçacıkları.
-- Kesilen blok parçaları için düşüş hareketi.
-- Animasyonlu oyun sonu kartı, retry, pause ve ana menü akışları.
-- Skor ve cihazda kalıcı en iyi skor.
+- Koşu sonunda skora ve PERFECT sayısına göre coin ödülü.
+- Tek seferlik ve cihazda kalıcı 3 görev: 10 blok, 3 PERFECT, 50 skor.
+- Görev tamamlamalarında ekstra coin ödülü.
+- 3 ücretsiz tema + coin ile açılan Neon, Uzay ve Aurora temaları.
+- Menüde coin bakiyesi, görev ilerlemesi ve sonraki tema kilit/fiyat bilgisi.
+- Oyun sonu ekranında koşu coin'i, görev bonusu ve toplam coin özeti.
+- Coin, görev ilerlemesi, açılan temalar, skor ve ayarlar cihazda kalıcı saklanır.
+- Pause, retry ve ana menü akışları.
 - Ses ve titreşim aç/kapat seçenekleri.
-- 3 yerel gökyüzü teması.
 - İnternet, hesap, reklam ve backend gerektirmez.
+
+## Ekonomi
+
+- Koşu coin'i: `max(1, skor / 5) + PERFECT` (boş koşu 0 coin).
+- 10 blok görevi: 20 coin.
+- 3 PERFECT görevi: 25 coin.
+- 50 skor görevi: 40 coin.
+- Neon: 60 coin.
+- Uzay: 120 coin.
+- Aurora: 200 coin.
 
 ## Android yapılandırması
 
 - Package: `com.elxvro.skytower`
-- Version: `0.3.0` (`versionCode 3`)
+- Version: `0.4.0` (`versionCode 4`)
 - minSdk: 26
 - compileSdk: 36
 - targetSdk: 36
