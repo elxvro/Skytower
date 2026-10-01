@@ -49,7 +49,7 @@ Debug APK: `app/build/outputs/apk/debug/app-debug.apk`
 4. Release APK
 5. Release AAB
 
-İmzalama sırrı yoksa debug APK kurulabilir test çıktısıdır. Release APK/AAB imzasız üretilir. Google Play için imzalı release oluşturmak üzere GitHub Secrets içine şunlar eklenebilir:
+CI, Java 17 için `actions/setup-java@v5` kullanır. İmzalama sırrı yoksa debug APK kurulabilir test çıktısıdır. Release APK/AAB imzasız üretilir. Google Play için imzalı release oluşturmak üzere GitHub Secrets içine şunlar eklenebilir:
 
 - `SKYTOWER_KEYSTORE_BASE64`
 - `SKYTOWER_KEYSTORE_PASSWORD`
