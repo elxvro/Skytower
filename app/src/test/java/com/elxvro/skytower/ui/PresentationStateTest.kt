@@ -53,6 +53,32 @@ class PresentationStateTest {
     }
 
     @Test
+    fun everyPlacementPulsesScoreThenReturnsToRest() {
+        val state = PresentationState()
+        state.startRun(showTutorial = false, cameraTarget = 0f)
+        state.triggerLanding(perfect = false, combo = 0)
+        assertTrue(state.scorePulseScale > 1f)
+
+        repeat(20) { state.update(0.05f, 0f, false) }
+        assertEquals(1f, state.scorePulseScale, 0.01f)
+    }
+
+    @Test
+    fun perfectHighComboCreatesStrongerShakeThanLowCombo() {
+        val state = PresentationState()
+        state.startRun(showTutorial = false, cameraTarget = 0f)
+        state.triggerLanding(perfect = true, combo = 1)
+        val lowComboShake = state.shakeIntensity
+
+        state.startRun(showTutorial = false, cameraTarget = 0f)
+        state.triggerLanding(perfect = true, combo = 5)
+        assertTrue(state.shakeIntensity > lowComboShake)
+
+        repeat(20) { state.update(0.05f, 0f, false) }
+        assertEquals(0f, state.shakeIntensity, 0.01f)
+    }
+
+    @Test
     fun gameOverOverlayProgressIsClampedBetweenZeroAndOne() {
         val state = PresentationState()
         state.startRun(showTutorial = false, cameraTarget = 0f)
