@@ -48,6 +48,42 @@ object ThemePalette {
                 0xFF8B78FF.toInt(), 0xFF4EE29A.toInt(), 0xFFFF785A.toInt(),
             ),
         ),
+        SkyTheme(
+            name = "Neon",
+            skyTop = 0xFF190B3D.toInt(),
+            skyBottom = 0xFF522282.toInt(),
+            cloud = 0xBFAEEBFF.toInt(),
+            islandRock = 0xFF3F315E.toInt(),
+            islandGrass = 0xFF2FE0C0.toInt(),
+            blocks = intArrayOf(
+                0xFF00E5FF.toInt(), 0xFFFF2BC2.toInt(), 0xFFB6FF33.toInt(),
+                0xFF8A5CFF.toInt(), 0xFFFFB51F.toInt(), 0xFF37F4A2.toInt(),
+            ),
+        ),
+        SkyTheme(
+            name = "Uzay",
+            skyTop = 0xFF050818.toInt(),
+            skyBottom = 0xFF1C285D.toInt(),
+            cloud = 0x9FC7D8FF.toInt(),
+            islandRock = 0xFF30364F.toInt(),
+            islandGrass = 0xFF6A78A8.toInt(),
+            blocks = intArrayOf(
+                0xFF5FE3FF.toInt(), 0xFF9B72FF.toInt(), 0xFFFF6BB5.toInt(),
+                0xFFFFD86A.toInt(), 0xFF65F2B2.toInt(), 0xFF719CFF.toInt(),
+            ),
+        ),
+        SkyTheme(
+            name = "Aurora",
+            skyTop = 0xFF092E3C.toInt(),
+            skyBottom = 0xFF30245F.toInt(),
+            cloud = 0xBFE4FFF6.toInt(),
+            islandRock = 0xFF3F5362.toInt(),
+            islandGrass = 0xFF62E4B0.toInt(),
+            blocks = intArrayOf(
+                0xFF58FFD0.toInt(), 0xFF7AB8FF.toInt(), 0xFFC388FF.toInt(),
+                0xFFFF82CE.toInt(), 0xFFFFE676.toInt(), 0xFF54E8FF.toInt(),
+            ),
+        ),
     )
 
     fun get(themeId: Int): SkyTheme = themes[Math.floorMod(themeId, themes.size)]
