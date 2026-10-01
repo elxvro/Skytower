@@ -13,9 +13,12 @@ import android.view.MotionEvent
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import com.elxvro.skytower.game.Block
+import com.elxvro.skytower.game.EconomyRules
 import com.elxvro.skytower.game.GameEngine
 import com.elxvro.skytower.game.PlacementResult
 import com.elxvro.skytower.game.RunMode
+import com.elxvro.skytower.game.RunStats
+import com.elxvro.skytower.game.SettlementResult
 import com.elxvro.skytower.platform.GamePreferences
 import com.elxvro.skytower.platform.HapticController
 import com.elxvro.skytower.platform.SoundController
@@ -42,6 +45,12 @@ class SkyTowerView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
     private var engine: GameEngine? = null
     private var newRecord = false
     private var skyTimeSeconds = 0f
+    private var runPlacements = 0
+    private var runPerfects = 0
+    private var runSettled = false
+    private var lastSettlement: SettlementResult? = null
+    private var themeNotice: String? = null
+    private var themeNoticeRemaining = 0f
     private val fallingPieces = mutableListOf<FallingPiece>()
     private val perfectParticles = mutableListOf<PerfectParticle>()
 
@@ -172,11 +181,26 @@ class SkyTowerView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
                 preferences.vibrationEnabled = !preferences.vibrationEnabled
                 hapticController.placed(preferences.vibrationEnabled, false)
             }
-            menuThemeRect().contains(x, y) -> {
-                preferences.themeId = (preferences.themeId + 1) % ThemePalette.themes.size
-                soundController.menu(preferences.soundEnabled)
+            menuThemeRect().contains(x, y) -> cycleOrUnlockTheme()
+        }
+    }
+
+    private fun cycleOrUnlockTheme() {
+        val nextId = (preferences.themeId + 1) % ThemePalette.themes.size
+        if (preferences.isThemeUnlocked(nextId)) {
+            preferences.themeId = nextId
+            themeNotice = ThemePalette.get(nextId).name.uppercase()
+        } else {
+            val result = preferences.tryUnlockTheme(nextId)
+            if (result.unlocked) {
+                preferences.themeId = nextId
+                themeNotice = "AÇILDI: ${ThemePalette.get(nextId).name.uppercase()}"
+            } else {
+                themeNotice = "${EconomyRules.themeCost(nextId)} COIN GEREKİYOR"
             }
         }
+        themeNoticeRemaining = 1.6f
+        soundController.menu(preferences.soundEnabled)
     }
 
     private fun handleRunningTap(x: Float, y: Float, activeEngine: GameEngine) {
@@ -196,10 +220,13 @@ class SkyTowerView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         when (result) {
             PlacementResult.Miss -> {
                 newRecord = preferences.updateBestScore(activeEngine.score)
+                settleCurrentRun(activeEngine)
                 soundController.gameOver(preferences.soundEnabled)
                 hapticController.gameOver(preferences.vibrationEnabled)
             }
             is PlacementResult.Success -> {
+                runPlacements += 1
+                if (result.perfect) runPerfects += 1
                 presentation.triggerLanding(result.perfect, activeEngine.combo)
                 result.cutFragment?.let { spawnFallingPiece(it) }
                 if (result.perfect) spawnPerfectParticles(activeEngine)
@@ -207,6 +234,18 @@ class SkyTowerView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
                 hapticController.placed(preferences.vibrationEnabled, result.perfect)
             }
         }
+    }
+
+    private fun settleCurrentRun(activeEngine: GameEngine) {
+        if (runSettled) return
+        lastSettlement = preferences.settleRun(
+            RunStats(
+                score = activeEngine.score,
+                placements = runPlacements,
+                perfects = runPerfects,
+            ),
+        )
+        runSettled = true
     }
 
     private fun handlePausedTap(x: Float, y: Float, activeEngine: GameEngine) {
@@ -246,6 +285,7 @@ class SkyTowerView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
 
     private fun beginRun(activeEngine: GameEngine, showTutorial: Boolean) {
         clearTransientVisuals()
+        resetRunEconomy()
         newRecord = false
         activeEngine.start()
         presentation.startRun(showTutorial = showTutorial, cameraTarget = activeEngine.cameraOffsetY)
@@ -253,6 +293,7 @@ class SkyTowerView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
 
     private fun restartRun(activeEngine: GameEngine) {
         clearTransientVisuals()
+        resetRunEconomy()
         newRecord = false
         activeEngine.restart()
         presentation.startRun(showTutorial = false, cameraTarget = activeEngine.cameraOffsetY)
@@ -260,9 +301,17 @@ class SkyTowerView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
 
     private fun returnToMenu(activeEngine: GameEngine) {
         clearTransientVisuals()
+        resetRunEconomy()
         presentation.dismissTutorial()
         presentation.startRun(showTutorial = false, cameraTarget = 0f)
         activeEngine.returnToMenu()
+    }
+
+    private fun resetRunEconomy() {
+        runPlacements = 0
+        runPerfects = 0
+        runSettled = false
+        lastSettlement = null
     }
 
     private fun clearTransientVisuals() {
@@ -273,13 +322,14 @@ class SkyTowerView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
     private fun updateEffects(deltaSeconds: Float) {
         val dt = min(deltaSeconds.coerceAtLeast(0f), 0.05f)
         val activeEngine = engine
-        val cameraTarget = activeEngine?.cameraOffsetY ?: 0f
         presentation.update(
             deltaSeconds = dt,
-            cameraTarget = cameraTarget,
+            cameraTarget = activeEngine?.cameraOffsetY ?: 0f,
             gameOver = activeEngine?.mode == RunMode.GAME_OVER,
         )
         skyTimeSeconds += dt
+        themeNoticeRemaining = max(0f, themeNoticeRemaining - dt)
+        if (themeNoticeRemaining <= 0f) themeNotice = null
 
         val fallingIterator = fallingPieces.iterator()
         while (fallingIterator.hasNext()) {
@@ -338,8 +388,13 @@ class SkyTowerView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
 
     private fun drawBackground(canvas: Canvas, theme: SkyTheme) {
         paint.shader = LinearGradient(
-            0f, 0f, 0f, height.toFloat(),
-            theme.skyTop, theme.skyBottom, Shader.TileMode.CLAMP,
+            0f,
+            0f,
+            0f,
+            height.toFloat(),
+            theme.skyTop,
+            theme.skyBottom,
+            Shader.TileMode.CLAMP,
         )
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
         paint.shader = null
@@ -347,7 +402,6 @@ class SkyTowerView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         val drift = sin(skyTimeSeconds * 0.32f) * width * 0.014f
         val reverseDrift = cos(skyTimeSeconds * 0.21f) * width * 0.010f
         val cameraParallax = presentation.cameraOffset * 0.09f
-
         drawCloud(canvas, width * 0.18f + drift, height * 0.18f + cameraParallax * 0.18f, width * 0.12f, theme.cloud)
         drawCloud(canvas, width * 0.76f - drift * 0.75f, height * 0.28f + cameraParallax * 0.13f, width * 0.09f, theme.cloud)
         drawCloud(canvas, width * 0.45f + reverseDrift, height * 0.45f + cameraParallax * 0.08f, width * 0.07f, theme.cloud)
@@ -380,35 +434,70 @@ class SkyTowerView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         paint.color = theme.islandGrass
         canvas.drawRoundRect(
             RectF(left - islandWidth * 0.04f, top, left + islandWidth * 1.04f, top + grassHeight),
-            grassHeight, grassHeight, paint,
+            grassHeight,
+            grassHeight,
+            paint,
         )
     }
 
     private fun drawMenu(canvas: Canvas, theme: SkyTheme) {
         textPaint.setShadowLayer(width * 0.012f, 0f, width * 0.008f, 0x66000000)
-        textPaint.textSize = width * 0.16f
+        textPaint.textSize = width * 0.15f
         textPaint.color = Color.WHITE
-        canvas.drawText("SKY", width / 2f, height * 0.27f, textPaint)
-        textPaint.textSize = width * 0.17f
+        canvas.drawText("SKY", width / 2f, height * 0.24f, textPaint)
+        textPaint.textSize = width * 0.16f
         textPaint.color = 0xFFFFC52D.toInt()
-        canvas.drawText("TOWER", width / 2f, height * 0.36f, textPaint)
+        canvas.drawText("TOWER", width / 2f, height * 0.33f, textPaint)
         textPaint.clearShadowLayer()
+
+        textPaint.textSize = width * 0.043f
+        textPaint.color = Color.WHITE
+        canvas.drawText("En yükseğe ulaş!", width / 2f, height * 0.39f, textPaint)
+        drawButton(canvas, playRect(), "OYNA", 0xFF156FE8.toInt(), 0.060f)
 
         textPaint.textSize = width * 0.047f
         textPaint.color = Color.WHITE
-        canvas.drawText("En yükseğe ulaş!", width / 2f, height * 0.415f, textPaint)
-        drawButton(canvas, playRect(), "OYNA", 0xFF156FE8.toInt(), 0.062f)
+        canvas.drawText("EN İYİ  ${preferences.bestScore}", width / 2f, height * 0.61f, textPaint)
+        textPaint.textSize = width * 0.046f
+        textPaint.color = 0xFFFFDF62.toInt()
+        canvas.drawText("◆ ${preferences.coins} COIN", width / 2f, height * 0.655f, textPaint)
 
-        textPaint.textSize = width * 0.052f
-        textPaint.color = Color.WHITE
-        canvas.drawText("EN İYİ  ${preferences.bestScore}", width / 2f, height * 0.64f, textPaint)
+        drawMissionStrip(canvas)
         drawSmallToggle(canvas, menuSoundRect(), "SES", preferences.soundEnabled)
         drawSmallToggle(canvas, menuVibrationRect(), "TİTREŞİM", preferences.vibrationEnabled)
         drawSmallToggle(canvas, menuThemeRect(), theme.name.uppercase(), true)
 
-        textPaint.textSize = width * 0.027f
-        textPaint.color = 0xCCFFFFFF.toInt()
-        canvas.drawText("v0.3", width / 2f, height * 0.82f, textPaint)
+        val nextId = (preferences.themeId + 1) % ThemePalette.themes.size
+        val nextTheme = ThemePalette.get(nextId)
+        val nextLabel = if (preferences.isThemeUnlocked(nextId)) {
+            "SONRAKİ: ${nextTheme.name.uppercase()}"
+        } else {
+            "KİLİTLİ: ${nextTheme.name.uppercase()} · ${EconomyRules.themeCost(nextId)}C"
+        }
+        textPaint.textSize = width * 0.024f
+        textPaint.color = 0xE6FFFFFF.toInt()
+        canvas.drawText(nextLabel, width * 0.79f, height * 0.815f, textPaint)
+
+        themeNotice?.let {
+            textPaint.textSize = width * 0.030f
+            textPaint.color = 0xFFFFE36B.toInt()
+            canvas.drawText(it, width / 2f, height * 0.86f, textPaint)
+        }
+
+        textPaint.textSize = width * 0.025f
+        textPaint.color = 0xBFFFFFFF.toInt()
+        canvas.drawText("v0.4", width / 2f, height * 0.91f, textPaint)
+    }
+
+    private fun drawMissionStrip(canvas: Canvas) {
+        val progress = preferences.missionProgress
+        val blocks = if (progress.isClaimed(EconomyRules.MISSION_BLOCKS)) "10/10 ✓" else "${min(progress.totalPlacements, 10)}/10"
+        val perfects = if (progress.isClaimed(EconomyRules.MISSION_PERFECTS)) "3/3 ✓" else "${min(progress.totalPerfects, 3)}/3"
+        val score = if (progress.isClaimed(EconomyRules.MISSION_SCORE)) "50/50 ✓" else "${min(progress.bestScore, 50)}/50"
+
+        textPaint.textSize = width * 0.025f
+        textPaint.color = 0xDFFFFFFF.toInt()
+        canvas.drawText("GÖREV · BLOK $blocks   PERFECT $perfects   SKOR $score", width / 2f, height * 0.695f, textPaint)
     }
 
     private fun drawTower(canvas: Canvas, activeEngine: GameEngine, theme: SkyTheme) {
@@ -434,8 +523,12 @@ class SkyTowerView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
             paint.strokeWidth = max(3f, width * 0.008f)
             paint.color = Color.argb((150 * strength).toInt(), 255, 255, 255)
             val grow = width * 0.018f * (1f - strength)
-            val pulseRect = RectF(rect.left - grow, rect.top - grow, rect.right + grow, rect.bottom + grow)
-            canvas.drawRoundRect(pulseRect, rect.height() * 0.22f, rect.height() * 0.22f, paint)
+            canvas.drawRoundRect(
+                RectF(rect.left - grow, rect.top - grow, rect.right + grow, rect.bottom + grow),
+                rect.height() * 0.22f,
+                rect.height() * 0.22f,
+                paint,
+            )
             paint.style = Paint.Style.FILL
         }
     }
@@ -444,7 +537,12 @@ class SkyTowerView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         val scale = width / activeEngine.viewportWidth
         val baseY = height * 0.82f
         val bottom = baseY - (block.y - presentation.cameraOffset) * scale
-        return RectF(block.x * scale, bottom - block.height * scale, (block.x + block.width) * scale, bottom)
+        return RectF(
+            block.x * scale,
+            bottom - block.height * scale,
+            (block.x + block.width) * scale,
+            bottom,
+        )
     }
 
     private fun landingRect(rect: RectF, scale: Float): RectF {
@@ -468,15 +566,18 @@ class SkyTowerView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         canvas.drawRoundRect(shadow, radius, radius, paint)
         paint.color = color
         canvas.drawRoundRect(rect, radius, radius, paint)
-
-        val highlight = RectF(
-            rect.left + rect.width() * 0.05f,
-            rect.top + rect.height() * 0.08f,
-            rect.right - rect.width() * 0.05f,
-            rect.top + rect.height() * 0.34f,
-        )
         paint.color = Color.argb(92, 255, 255, 255)
-        canvas.drawRoundRect(highlight, radius * 0.75f, radius * 0.75f, paint)
+        canvas.drawRoundRect(
+            RectF(
+                rect.left + rect.width() * 0.05f,
+                rect.top + rect.height() * 0.08f,
+                rect.right - rect.width() * 0.05f,
+                rect.top + rect.height() * 0.34f,
+            ),
+            radius * 0.75f,
+            radius * 0.75f,
+            paint,
+        )
     }
 
     private fun drawHud(canvas: Canvas, activeEngine: GameEngine) {
@@ -491,18 +592,21 @@ class SkyTowerView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         canvas.drawText(activeEngine.score.toString(), width / 2f, height * 0.13f, textPaint)
         textPaint.clearShadowLayer()
 
+        textPaint.textSize = width * 0.031f
+        textPaint.color = 0xFFFFDF62.toInt()
+        canvas.drawText("◆ ${preferences.coins}", width * 0.87f, height * 0.065f, textPaint)
+
         if (activeEngine.combo >= 2) {
             val comboBoost = presentation.perfectIntensity * min(activeEngine.combo, 6) * 0.004f
             textPaint.textSize = width * (0.05f + comboBoost)
             textPaint.color = 0xFFFFE064.toInt()
-            canvas.drawText("x${activeEngine.combo} KOMBO", width * 0.78f, height * 0.105f, textPaint)
+            canvas.drawText("x${activeEngine.combo} KOMBO", width * 0.78f, height * 0.115f, textPaint)
         }
     }
 
     private fun drawPlacementFeedback(canvas: Canvas, activeEngine: GameEngine) {
         val intensity = presentation.perfectIntensity.coerceIn(0f, 1f)
         if (intensity <= 0f) return
-
         val alpha = (255 * intensity).toInt().coerceIn(0, 255)
         val lift = (1f - intensity) * height * 0.035f
         textPaint.textSize = width * (0.070f + intensity * 0.010f)
@@ -510,7 +614,6 @@ class SkyTowerView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         textPaint.setShadowLayer(width * 0.008f, 0f, width * 0.004f, Color.argb(alpha / 2, 55, 30, 0))
         canvas.drawText("PERFECT!", width / 2f, height * 0.30f - lift, textPaint)
         textPaint.clearShadowLayer()
-
         if (activeEngine.combo >= 2) {
             textPaint.textSize = width * 0.044f
             textPaint.color = Color.argb(alpha, 255, 255, 255)
@@ -545,7 +648,12 @@ class SkyTowerView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
     private fun spawnPerfectParticles(activeEngine: GameEngine) {
         val placed = activeEngine.placedBlocks.lastOrNull() ?: return
         val rect = blockRect(placed, activeEngine)
-        val colors = intArrayOf(0xFFFFFFFF.toInt(), 0xFFFFE36B.toInt(), 0xFF7FE8FF.toInt(), 0xFFFF8DCE.toInt())
+        val colors = intArrayOf(
+            0xFFFFFFFF.toInt(),
+            0xFFFFE36B.toInt(),
+            0xFF7FE8FF.toInt(),
+            0xFFFF8DCE.toInt(),
+        )
         val particleCount = 12 + min(activeEngine.combo, 6)
         for (index in 0 until particleCount) {
             val angle = (index.toDouble() / particleCount.toDouble()) * PI * 2.0
@@ -568,7 +676,12 @@ class SkyTowerView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         perfectParticles.forEach { particle ->
             val ratio = (particle.life / particle.maxLife).coerceIn(0f, 1f)
             val alpha = (255 * ratio).toInt()
-            paint.color = Color.argb(alpha, Color.red(particle.color), Color.green(particle.color), Color.blue(particle.color))
+            paint.color = Color.argb(
+                alpha,
+                Color.red(particle.color),
+                Color.green(particle.color),
+                Color.blue(particle.color),
+            )
             canvas.drawCircle(particle.x, particle.y, particle.radius * (0.65f + ratio * 0.55f), paint)
         }
     }
@@ -577,27 +690,21 @@ class SkyTowerView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         paint.color = 0x44091B3A
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
         val card = RectF(width * 0.12f, height * 0.57f, width * 0.88f, height * 0.76f)
-        paint.color = 0xE8213961.toInt()
-        canvas.drawRoundRect(card, width * 0.055f, width * 0.055f, paint)
-        paint.style = Paint.Style.STROKE
-        paint.strokeWidth = width * 0.004f
-        paint.color = 0x77FFFFFF
-        canvas.drawRoundRect(card, width * 0.055f, width * 0.055f, paint)
-        paint.style = Paint.Style.FILL
-
+        drawPanel(canvas, card)
         val pulse = (sin(skyTimeSeconds * 6f) * 0.5f + 0.5f).coerceIn(0f, 1f)
-        val fingerY = card.top + card.height() * 0.33f + pulse * height * 0.008f
+        val fingerY = card.top + card.height() * 0.30f + pulse * height * 0.008f
         paint.color = 0xFFF6D4B9.toInt()
         canvas.drawCircle(width / 2f, fingerY, width * 0.032f, paint)
         canvas.drawRoundRect(
             RectF(width * 0.485f, fingerY, width * 0.515f, fingerY + height * 0.035f),
-            width * 0.015f, width * 0.015f, paint,
+            width * 0.015f,
+            width * 0.015f,
+            paint,
         )
-
-        textPaint.textSize = width * 0.046f
+        textPaint.textSize = width * 0.044f
         textPaint.color = Color.WHITE
         canvas.drawText("DOKUN VE BLOĞU BIRAK", width / 2f, card.top + card.height() * 0.66f, textPaint)
-        textPaint.textSize = width * 0.032f
+        textPaint.textSize = width * 0.030f
         textPaint.color = 0xFFFFE36B.toInt()
         canvas.drawText("Tam hizala → PERFECT!", width / 2f, card.top + card.height() * 0.84f, textPaint)
     }
@@ -623,17 +730,31 @@ class SkyTowerView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         canvas.save()
         canvas.scale(scale, scale, card.centerX(), card.centerY())
         drawPanel(canvas, card)
-        drawOverlayTitle(canvas, "OYUN BİTTİ", card.top + card.height() * 0.14f)
+        drawOverlayTitle(canvas, "OYUN BİTTİ", card.top + card.height() * 0.12f)
 
-        textPaint.textSize = width * 0.105f
+        textPaint.textSize = width * 0.095f
         textPaint.color = Color.WHITE
-        canvas.drawText(activeEngine.score.toString(), width / 2f, card.top + card.height() * 0.31f, textPaint)
-        textPaint.textSize = width * 0.041f
-        canvas.drawText("EN İYİ  ${preferences.bestScore}", width / 2f, card.top + card.height() * 0.40f, textPaint)
+        canvas.drawText(activeEngine.score.toString(), width / 2f, card.top + card.height() * 0.27f, textPaint)
+        textPaint.textSize = width * 0.036f
+        canvas.drawText("EN İYİ  ${preferences.bestScore}", width / 2f, card.top + card.height() * 0.35f, textPaint)
+
         if (newRecord) {
             textPaint.color = 0xFFFFD84D.toInt()
-            canvas.drawText("YENİ REKOR!", width / 2f, card.top + card.height() * 0.47f, textPaint)
+            canvas.drawText("YENİ REKOR!", width / 2f, card.top + card.height() * 0.41f, textPaint)
         }
+
+        val settlement = lastSettlement
+        textPaint.textSize = width * 0.044f
+        textPaint.color = 0xFFFFE36B.toInt()
+        canvas.drawText("+${settlement?.totalCoinsAwarded ?: 0} COIN", width / 2f, card.top + card.height() * 0.49f, textPaint)
+        textPaint.textSize = width * 0.031f
+        textPaint.color = Color.WHITE
+        canvas.drawText("TOPLAM ${preferences.coins} COIN", width / 2f, card.top + card.height() * 0.55f, textPaint)
+        if ((settlement?.missionCoins ?: 0) > 0) {
+            textPaint.color = 0xFF7FF2C0.toInt()
+            canvas.drawText("GÖREV BONUSU +${settlement!!.missionCoins}", width / 2f, card.top + card.height() * 0.60f, textPaint)
+        }
+
         drawButton(canvas, gameOverRetryRect(), "TEKRAR OYNA", 0xFF1E88E5.toInt(), 0.043f)
         drawButton(canvas, gameOverMenuRect(), "ANA MENÜ", 0xFF374A6D.toInt(), 0.042f)
         canvas.restore()
@@ -645,8 +766,7 @@ class SkyTowerView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
     }
 
     private fun drawDim(canvas: Canvas, alphaScale: Float = 1f) {
-        val alpha = (153 * alphaScale.coerceIn(0f, 1f)).toInt()
-        paint.color = Color.argb(alpha, 11, 21, 48)
+        paint.color = Color.argb((153 * alphaScale.coerceIn(0f, 1f)).toInt(), 11, 21, 48)
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
     }
 
@@ -661,7 +781,7 @@ class SkyTowerView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
     }
 
     private fun drawOverlayTitle(canvas: Canvas, text: String, y: Float) {
-        textPaint.textSize = width * 0.063f
+        textPaint.textSize = width * 0.060f
         textPaint.color = Color.WHITE
         canvas.drawText(text, width / 2f, y, textPaint)
     }
@@ -673,7 +793,9 @@ class SkyTowerView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         paint.color = 0x26FFFFFF
         canvas.drawRoundRect(
             RectF(rect.left + 3f, rect.top + 3f, rect.right - 3f, rect.top + rect.height() * 0.46f),
-            rect.height() * 0.28f, rect.height() * 0.28f, paint,
+            rect.height() * 0.28f,
+            rect.height() * 0.28f,
+            paint,
         )
         textPaint.textSize = width * textScale
         textPaint.color = Color.WHITE
@@ -684,25 +806,25 @@ class SkyTowerView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
     private fun drawSmallToggle(canvas: Canvas, rect: RectF, label: String, enabled: Boolean) {
         paint.color = if (enabled) 0xCC1579D7.toInt() else 0x9940526D.toInt()
         canvas.drawRoundRect(rect, rect.height() * 0.28f, rect.height() * 0.28f, paint)
-        textPaint.textSize = width * 0.030f
+        textPaint.textSize = width * 0.028f
         textPaint.color = Color.WHITE
         val baseline = rect.centerY() - (textPaint.ascent() + textPaint.descent()) / 2f
         canvas.drawText(label, rect.centerX(), baseline, textPaint)
     }
 
-    private fun playRect() = centeredRect(width * 0.64f, height * 0.083f, height * 0.53f)
-    private fun menuSoundRect() = RectF(width * 0.08f, height * 0.70f, width * 0.34f, height * 0.76f)
-    private fun menuVibrationRect() = RectF(width * 0.37f, height * 0.70f, width * 0.63f, height * 0.76f)
-    private fun menuThemeRect() = RectF(width * 0.66f, height * 0.70f, width * 0.92f, height * 0.76f)
+    private fun playRect() = centeredRect(width * 0.64f, height * 0.082f, height * 0.50f)
+    private fun menuSoundRect() = RectF(width * 0.08f, height * 0.735f, width * 0.34f, height * 0.795f)
+    private fun menuVibrationRect() = RectF(width * 0.37f, height * 0.735f, width * 0.63f, height * 0.795f)
+    private fun menuThemeRect() = RectF(width * 0.66f, height * 0.735f, width * 0.92f, height * 0.795f)
     private fun pauseRect() = RectF(width * 0.035f, height * 0.035f, width * 0.16f, height * 0.095f)
-    private fun overlayCardRect() = RectF(width * 0.10f, height * 0.18f, width * 0.90f, height * 0.84f)
+    private fun overlayCardRect() = RectF(width * 0.10f, height * 0.16f, width * 0.90f, height * 0.86f)
     private fun pauseResumeRect() = centeredRect(width * 0.58f, height * 0.071f, height * 0.40f)
     private fun pauseRestartRect() = centeredRect(width * 0.58f, height * 0.066f, height * 0.50f)
     private fun pauseMenuRect() = centeredRect(width * 0.58f, height * 0.066f, height * 0.59f)
     private fun pauseSoundRect() = RectF(width * 0.20f, height * 0.68f, width * 0.47f, height * 0.74f)
     private fun pauseVibrationRect() = RectF(width * 0.53f, height * 0.68f, width * 0.80f, height * 0.74f)
-    private fun gameOverRetryRect() = centeredRect(width * 0.62f, height * 0.073f, height * 0.61f)
-    private fun gameOverMenuRect() = centeredRect(width * 0.62f, height * 0.066f, height * 0.71f)
+    private fun gameOverRetryRect() = centeredRect(width * 0.62f, height * 0.073f, height * 0.69f)
+    private fun gameOverMenuRect() = centeredRect(width * 0.62f, height * 0.066f, height * 0.79f)
 
     private fun centeredRect(rectWidth: Float, rectHeight: Float, centerY: Float) = RectF(
         (width - rectWidth) / 2f,
