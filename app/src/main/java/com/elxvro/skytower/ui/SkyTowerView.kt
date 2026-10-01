@@ -84,9 +84,7 @@ class SkyTowerView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
             var canvas: Canvas? = null
             try {
                 canvas = holder.lockCanvas()
-                if (canvas != null) {
-                    synchronized(stateLock) { drawScene(canvas) }
-                }
+                if (canvas != null) synchronized(stateLock) { drawScene(canvas) }
             } finally {
                 if (canvas != null) holder.unlockCanvasAndPost(canvas)
             }
@@ -312,9 +310,7 @@ class SkyTowerView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
             return
         }
 
-        drawTower(canvas, activeEngine, theme)
-        drawFallingPieces(canvas)
-        drawPerfectParticles(canvas)
+        drawShakenGameplay(canvas, activeEngine, theme)
         drawHud(canvas, activeEngine)
         drawPlacementFeedback(canvas, activeEngine)
 
@@ -326,15 +322,24 @@ class SkyTowerView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         }
     }
 
+    private fun drawShakenGameplay(canvas: Canvas, activeEngine: GameEngine, theme: SkyTheme) {
+        val shake = presentation.shakeIntensity.coerceIn(0f, 1f)
+        canvas.save()
+        if (shake > 0f) {
+            val x = sin(skyTimeSeconds * 82f) * width * 0.0065f * shake
+            val y = cos(skyTimeSeconds * 67f) * height * 0.0032f * shake
+            canvas.translate(x, y)
+        }
+        drawTower(canvas, activeEngine, theme)
+        drawFallingPieces(canvas)
+        drawPerfectParticles(canvas)
+        canvas.restore()
+    }
+
     private fun drawBackground(canvas: Canvas, theme: SkyTheme) {
         paint.shader = LinearGradient(
-            0f,
-            0f,
-            0f,
-            height.toFloat(),
-            theme.skyTop,
-            theme.skyBottom,
-            Shader.TileMode.CLAMP,
+            0f, 0f, 0f, height.toFloat(),
+            theme.skyTop, theme.skyBottom, Shader.TileMode.CLAMP,
         )
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
         paint.shader = null
@@ -346,7 +351,6 @@ class SkyTowerView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         drawCloud(canvas, width * 0.18f + drift, height * 0.18f + cameraParallax * 0.18f, width * 0.12f, theme.cloud)
         drawCloud(canvas, width * 0.76f - drift * 0.75f, height * 0.28f + cameraParallax * 0.13f, width * 0.09f, theme.cloud)
         drawCloud(canvas, width * 0.45f + reverseDrift, height * 0.45f + cameraParallax * 0.08f, width * 0.07f, theme.cloud)
-
         drawFloatingIsland(canvas, width * 0.10f + reverseDrift, height * 0.36f + cameraParallax * 0.48f, width * 0.16f, theme)
         drawFloatingIsland(canvas, width * 0.78f - drift * 0.45f, height * 0.50f + cameraParallax * 0.36f, width * 0.14f, theme)
         drawFloatingIsland(canvas, width * 0.64f + drift * 0.30f, height * 0.14f + cameraParallax * 0.58f, width * 0.10f, theme)
@@ -376,9 +380,7 @@ class SkyTowerView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         paint.color = theme.islandGrass
         canvas.drawRoundRect(
             RectF(left - islandWidth * 0.04f, top, left + islandWidth * 1.04f, top + grassHeight),
-            grassHeight,
-            grassHeight,
-            paint,
+            grassHeight, grassHeight, paint,
         )
     }
 
@@ -406,7 +408,7 @@ class SkyTowerView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
 
         textPaint.textSize = width * 0.027f
         textPaint.color = 0xCCFFFFFF.toInt()
-        canvas.drawText("v0.2", width / 2f, height * 0.82f, textPaint)
+        canvas.drawText("v0.3", width / 2f, height * 0.82f, textPaint)
     }
 
     private fun drawTower(canvas: Canvas, activeEngine: GameEngine, theme: SkyTheme) {
@@ -422,11 +424,7 @@ class SkyTowerView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         }
 
         activeEngine.movingBlock?.let { moving ->
-            drawGlossyBlock(
-                canvas,
-                blockRect(moving, activeEngine),
-                theme.blocks[moving.paletteIndex % theme.blocks.size],
-            )
+            drawGlossyBlock(canvas, blockRect(moving, activeEngine), theme.blocks[moving.paletteIndex % theme.blocks.size])
         }
 
         if (presentation.landingScale > 1.001f && activeEngine.placedBlocks.isNotEmpty()) {
@@ -446,12 +444,7 @@ class SkyTowerView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         val scale = width / activeEngine.viewportWidth
         val baseY = height * 0.82f
         val bottom = baseY - (block.y - presentation.cameraOffset) * scale
-        return RectF(
-            block.x * scale,
-            bottom - block.height * scale,
-            (block.x + block.width) * scale,
-            bottom,
-        )
+        return RectF(block.x * scale, bottom - block.height * scale, (block.x + block.width) * scale, bottom)
     }
 
     private fun landingRect(rect: RectF, scale: Float): RectF {
@@ -473,7 +466,6 @@ class SkyTowerView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         paint.color = Color.argb(55, 0, 0, 0)
         val shadow = RectF(rect).apply { offset(0f, rect.height() * 0.10f) }
         canvas.drawRoundRect(shadow, radius, radius, paint)
-
         paint.color = color
         canvas.drawRoundRect(rect, radius, radius, paint)
 
@@ -492,11 +484,16 @@ class SkyTowerView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         textPaint.textSize = width * 0.038f
         textPaint.color = Color.WHITE
         canvas.drawText("SKOR", width / 2f, height * 0.075f, textPaint)
-        textPaint.textSize = width * 0.105f
+
+        val scoreScale = presentation.scorePulseScale.coerceIn(1f, 1.20f)
+        textPaint.textSize = width * 0.105f * scoreScale
+        textPaint.setShadowLayer(width * 0.008f * (scoreScale - 0.9f), 0f, 0f, 0x55FFFFFF)
         canvas.drawText(activeEngine.score.toString(), width / 2f, height * 0.13f, textPaint)
+        textPaint.clearShadowLayer()
 
         if (activeEngine.combo >= 2) {
-            textPaint.textSize = width * 0.05f
+            val comboBoost = presentation.perfectIntensity * min(activeEngine.combo, 6) * 0.004f
+            textPaint.textSize = width * (0.05f + comboBoost)
             textPaint.color = 0xFFFFE064.toInt()
             canvas.drawText("x${activeEngine.combo} KOMBO", width * 0.78f, height * 0.105f, textPaint)
         }
@@ -548,23 +545,15 @@ class SkyTowerView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
     private fun spawnPerfectParticles(activeEngine: GameEngine) {
         val placed = activeEngine.placedBlocks.lastOrNull() ?: return
         val rect = blockRect(placed, activeEngine)
-        val centerX = rect.centerX()
-        val centerY = rect.centerY()
-        val colors = intArrayOf(
-            0xFFFFFFFF.toInt(),
-            0xFFFFE36B.toInt(),
-            0xFF7FE8FF.toInt(),
-            0xFFFF8DCE.toInt(),
-        )
-
+        val colors = intArrayOf(0xFFFFFFFF.toInt(), 0xFFFFE36B.toInt(), 0xFF7FE8FF.toInt(), 0xFFFF8DCE.toInt())
         val particleCount = 12 + min(activeEngine.combo, 6)
         for (index in 0 until particleCount) {
             val angle = (index.toDouble() / particleCount.toDouble()) * PI * 2.0
             val speed = width * (0.15f + (index % 4) * 0.025f)
             val life = 0.45f + (index % 5) * 0.055f
             perfectParticles += PerfectParticle(
-                x = centerX,
-                y = centerY,
+                x = rect.centerX(),
+                y = rect.centerY(),
                 velocityX = cos(angle).toFloat() * speed,
                 velocityY = sin(angle).toFloat() * speed - height * 0.035f,
                 life = life,
@@ -587,7 +576,6 @@ class SkyTowerView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
     private fun drawTutorialOverlay(canvas: Canvas) {
         paint.color = 0x44091B3A
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
-
         val card = RectF(width * 0.12f, height * 0.57f, width * 0.88f, height * 0.76f)
         paint.color = 0xE8213961.toInt()
         canvas.drawRoundRect(card, width * 0.055f, width * 0.055f, paint)
@@ -603,9 +591,7 @@ class SkyTowerView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         canvas.drawCircle(width / 2f, fingerY, width * 0.032f, paint)
         canvas.drawRoundRect(
             RectF(width * 0.485f, fingerY, width * 0.515f, fingerY + height * 0.035f),
-            width * 0.015f,
-            width * 0.015f,
-            paint,
+            width * 0.015f, width * 0.015f, paint,
         )
 
         textPaint.textSize = width * 0.046f
@@ -631,7 +617,6 @@ class SkyTowerView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
     private fun drawGameOverOverlay(canvas: Canvas, activeEngine: GameEngine) {
         val progress = presentation.gameOverProgress.coerceIn(0f, 1f)
         if (progress <= 0f) return
-
         drawDim(canvas, progress)
         val card = overlayCardRect()
         val scale = 0.88f + 0.12f * easeOutCubic(progress)
@@ -645,12 +630,10 @@ class SkyTowerView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         canvas.drawText(activeEngine.score.toString(), width / 2f, card.top + card.height() * 0.31f, textPaint)
         textPaint.textSize = width * 0.041f
         canvas.drawText("EN İYİ  ${preferences.bestScore}", width / 2f, card.top + card.height() * 0.40f, textPaint)
-
         if (newRecord) {
             textPaint.color = 0xFFFFD84D.toInt()
             canvas.drawText("YENİ REKOR!", width / 2f, card.top + card.height() * 0.47f, textPaint)
         }
-
         drawButton(canvas, gameOverRetryRect(), "TEKRAR OYNA", 0xFF1E88E5.toInt(), 0.043f)
         drawButton(canvas, gameOverMenuRect(), "ANA MENÜ", 0xFF374A6D.toInt(), 0.042f)
         canvas.restore()
@@ -690,9 +673,7 @@ class SkyTowerView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         paint.color = 0x26FFFFFF
         canvas.drawRoundRect(
             RectF(rect.left + 3f, rect.top + 3f, rect.right - 3f, rect.top + rect.height() * 0.46f),
-            rect.height() * 0.28f,
-            rect.height() * 0.28f,
-            paint,
+            rect.height() * 0.28f, rect.height() * 0.28f, paint,
         )
         textPaint.textSize = width * textScale
         textPaint.color = Color.WHITE
