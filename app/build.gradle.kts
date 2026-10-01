@@ -7,11 +7,11 @@ val signingStorePath = providers.environmentVariable("SKYTOWER_KEYSTORE_PATH").o
 val signingStorePassword = providers.environmentVariable("SKYTOWER_KEYSTORE_PASSWORD").orNull
 val signingKeyAlias = providers.environmentVariable("SKYTOWER_KEY_ALIAS").orNull
 val signingKeyPassword = providers.environmentVariable("SKYTOWER_KEY_PASSWORD").orNull
-val hasReleaseSigning = !signingStorePath.isNullOrBlank() &&
+val releaseStoreFile = signingStorePath?.takeIf { it.isNotBlank() }?.let(::file)
+val hasReleaseSigning = releaseStoreFile?.exists() == true &&
     !signingStorePassword.isNullOrBlank() &&
     !signingKeyAlias.isNullOrBlank() &&
-    !signingKeyPassword.isNullOrBlank() &&
-    file(signingStorePath!!).exists()
+    !signingKeyPassword.isNullOrBlank()
 
 android {
     namespace = "com.elxvro.skytower"
@@ -21,14 +21,14 @@ android {
         applicationId = "com.elxvro.skytower"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.3.0"
     }
 
     signingConfigs {
         if (hasReleaseSigning) {
             create("release") {
-                storeFile = file(signingStorePath!!)
+                storeFile = requireNotNull(releaseStoreFile)
                 storePassword = signingStorePassword
                 keyAlias = signingKeyAlias
                 keyPassword = signingKeyPassword
@@ -49,12 +49,14 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-
     testOptions {
         unitTests.isReturnDefaultValues = true
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
 
