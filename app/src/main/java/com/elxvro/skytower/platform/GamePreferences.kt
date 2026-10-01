@@ -21,6 +21,10 @@ class GamePreferences(context: Context) {
         get() = preferences.getInt(KEY_THEME, 0)
         set(value) = preferences.edit().putInt(KEY_THEME, value.coerceAtLeast(0)).apply()
 
+    var tutorialSeen: Boolean
+        get() = preferences.getBoolean(KEY_TUTORIAL_SEEN, false)
+        set(value) = preferences.edit().putBoolean(KEY_TUTORIAL_SEEN, value).apply()
+
     fun updateBestScore(score: Int): Boolean {
         if (score <= bestScore) return false
         bestScore = score
@@ -33,5 +37,6 @@ class GamePreferences(context: Context) {
         private const val KEY_SOUND = "sound_enabled"
         private const val KEY_VIBRATION = "vibration_enabled"
         private const val KEY_THEME = "theme_id"
+        private const val KEY_TUTORIAL_SEEN = "tutorial_seen"
     }
 }
