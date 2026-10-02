@@ -7,5 +7,6 @@ enum class AppScreen {
     LEVELS,
     BLOCK_SKINS,
     POWER_UPS,
+    SETTINGS,
     GAMEPLAY,
 }
