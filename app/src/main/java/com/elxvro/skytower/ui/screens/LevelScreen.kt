@@ -22,7 +22,7 @@ class LevelScreen(private val kit: SkyVisualKit) {
         val back = l.referenceRect(45f, 60f, 110f, 90f)
         kit.drawBack(canvas, back.rf()); hits += back to ScreenAction.Back
         kit.drawCoinCapsule(canvas, l.referenceRect(815f, 65f, 220f, 82f).rf(), progress.coins)
-        kit.drawRibbon(canvas, l.referenceRect(250f, 285f, 580f, 105f).rf(), "SEVİYE SİSTEMİ")
+        kit.drawRibbon(canvas, l.referenceRect(250f, 285f, 580f, 105f).rf(), "SEVİYE")
 
         val panel = l.referenceRect(70f, 420f, 940f, 1290f)
         kit.drawPanel(canvas, panel.rf())
