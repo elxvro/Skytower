@@ -10,6 +10,8 @@ sealed interface ScreenAction {
     data object Back : ScreenAction
     data object ToggleSound : ScreenAction
     data object ToggleVibration : ScreenAction
+    data object ToggleTutorial : ScreenAction
+    data object ResetData : ScreenAction
     data class Open(val screen: AppScreen) : ScreenAction
     data class Theme(val themeId: Int) : ScreenAction
     data class ClaimDaily(val mission: DailyMission) : ScreenAction
