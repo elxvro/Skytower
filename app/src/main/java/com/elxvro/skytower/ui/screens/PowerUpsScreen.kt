@@ -1,12 +1,14 @@
 package com.elxvro.skytower.ui.screens
 
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.RectF
 import com.elxvro.skytower.game.PowerUpRules
 import com.elxvro.skytower.game.PowerUpType
 import com.elxvro.skytower.platform.PlayerProgress
 import com.elxvro.skytower.ui.InventoryInteractionState
 import com.elxvro.skytower.ui.PowerActionState
+import com.elxvro.skytower.ui.ReferenceDesignTokens
 import com.elxvro.skytower.ui.ScreenLayout
 import com.elxvro.skytower.ui.SkyVisualKit
 import com.elxvro.skytower.ui.UiRect
@@ -19,37 +21,39 @@ class PowerUpsScreen(private val kit: SkyVisualKit) {
         val l = ScreenLayout(canvas.width.toFloat(), canvas.height.toFloat())
         val s = l.scale
         kit.drawSky(canvas, canvas.width.toFloat(), canvas.height.toFloat())
-        kit.drawLogo(canvas, canvas.width.toFloat(), 145f * s)
-        val back = l.referenceRect(45f, 60f, 110f, 90f)
+        val back = l.referenceRect(32f, 42f, 95f, 86f)
         kit.drawBack(canvas, back.rf()); hits += back to ScreenAction.Back
-        kit.drawCoinCapsule(canvas, l.referenceRect(815f, 65f, 220f, 82f).rf(), progress.coins)
-        kit.drawRibbon(canvas, l.referenceRect(250f, 285f, 580f, 105f).rf(), "GÜÇLENDİRMELER")
+        kit.drawCoinCapsule(canvas, l.referenceRect(770f, 44f, 275f, 82f).rf(), progress.coins)
+        kit.drawRibbon(
+            canvas,
+            l.referenceRect(145f, 175f, 790f, 125f).rf(),
+            "GÜÇLENDİRMELER",
+            ReferenceDesignTokens.ORANGE,
+            0xFFB85B00.toInt(),
+        )
 
-        val panel = l.referenceRect(70f, 420f, 940f, 1290f)
-        kit.drawPanel(canvas, panel.rf())
         val types = PowerUpType.entries
         types.forEachIndexed { index, type ->
-            val y = 485f + index * 260f
-            val card = l.referenceRect(115f, y, 850f, 225f)
-            kit.drawBlueCard(canvas, card.rf(), when (type) {
-                PowerUpType.SECOND_CHANCE -> 0xFF3566C7.toInt()
-                PowerUpType.SLOW_TIME -> 0xFF2B75C9.toInt()
-                PowerUpType.WIDE_PERFECT -> 0xFF6951C9.toInt()
-                PowerUpType.COIN_MULTIPLIER -> 0xFF836018.toInt()
-            })
-            val iconX = card.left + 105f*s
+            val y = 355f + index * 300f
+            val card = l.referenceRect(55f, y, 970f, 260f)
+            kit.drawBlueCard(canvas, card.rf(), cardColor(type))
+            val iconX = card.left + 150f*s
             val iconY = card.centerY
-            kit.paint.color = 0xFFFFD54A.toInt()
-            canvas.drawCircle(iconX, iconY, 55f*s, kit.paint)
-            kit.drawTitle(canvas, icon(type), iconX, iconY + 16f*s, 42f*s, 0xFF193A70.toInt())
-            kit.drawTitle(canvas, title(type), card.left + 345f*s, card.top + 65f*s, 31f*s, 0xFFFFFFFF.toInt())
-            kit.drawTitle(canvas, description(type), card.left + 345f*s, card.top + 108f*s, 22f*s, 0xFFDCEEFF.toInt())
-            kit.drawTitle(canvas, "STOK ${progress.powerUpInventory.count(type)}", card.left + 300f*s, card.bottom - 37f*s, 22f*s, 0xFFFFE37B.toInt())
+            drawIcon(canvas, type, iconX, iconY, s)
 
-            val actionRect = UiRect(card.right - 250f*s, card.top + 128f*s, card.right - 28f*s, card.bottom - 28f*s)
+            kit.text.textAlign = android.graphics.Paint.Align.LEFT
+            kit.drawOutlinedTitle(canvas, title(type), card.left + 285f*s, card.top + 70f*s, 35f*s, Color.WHITE)
+            kit.drawTitle(canvas, description(type), card.left + 285f*s, card.top + 120f*s, 23f*s, 0xFF163D78.toInt())
+            kit.text.textAlign = android.graphics.Paint.Align.CENTER
+
+            val stock = l.referenceRect(720f, y + 22f, 245f, 70f)
+            kit.drawBlueCard(canvas, stock.rf(), 0xC924477B.toInt())
+            kit.drawTitle(canvas, "x${progress.powerUpInventory.count(type)}", stock.centerX, stock.centerY + 10f*s, 28f*s, Color.WHITE)
+
+            val actionRect = l.referenceRect(685f, y + 135f, 285f, 92f)
             when (InventoryInteractionState.power(type, progress.powerUpInventory, progress.equippedPowerUps)) {
                 PowerActionState.BUY -> {
-                    kit.drawPrice(canvas, actionRect.rf(), PowerUpRules.price(type), locked = false)
+                    kit.drawButton(canvas, actionRect.rf(), "${PowerUpRules.price(type)}  SATIN AL", green = true)
                     hits += actionRect to ScreenAction.BuyPowerUp(type)
                 }
                 PowerActionState.EQUIP -> {
@@ -63,20 +67,29 @@ class PowerUpsScreen(private val kit: SkyVisualKit) {
             }
         }
 
-        kit.drawTitle(canvas, "KUŞANILANLAR  ${progress.equippedPowerUps.size}/3", canvas.width*.5f, 1570f*s, 29f*s)
-        val strip = l.referenceRect(180f, 1600f, 720f, 90f)
-        kit.drawBlueCard(canvas, strip.rf(), 0xFF193F7D.toInt())
+        kit.drawTitle(canvas, "KUŞANILANLAR  ${progress.equippedPowerUps.size}/3", canvas.width*.5f, 1585f*s, 28f*s, ReferenceDesignTokens.TEXT)
+        val strip = l.referenceRect(180f, 1620f, 720f, 92f)
+        kit.drawBlueCard(canvas, strip.rf(), ReferenceDesignTokens.NAVY)
         val equipped = progress.equippedPowerUps.toList()
-        for (slot in 0 until 3) {
+        repeat(3) { slot ->
             val cx = strip.left + (120f + slot*240f)*s
             val type = equipped.getOrNull(slot)
-            kit.paint.color = if (type == null) 0xFF58749D.toInt() else 0xFFFFD54A.toInt()
-            canvas.drawCircle(cx, strip.centerY, 32f*s, kit.paint)
-            kit.drawTitle(canvas, type?.let(::icon) ?: "+", cx, strip.centerY + 10f*s, 25f*s, 0xFF17345F.toInt())
+            kit.paint.color = if (type == null) 0xFF60799B.toInt() else ReferenceDesignTokens.GOLD
+            canvas.drawCircle(cx, strip.centerY, 31f*s, kit.paint)
+            if (type == null) kit.drawTitle(canvas, "+", cx, strip.centerY + 10f*s, 26f*s, Color.WHITE)
+            else kit.drawTitle(canvas, shortIcon(type), cx, strip.centerY + 9f*s, 22f*s, ReferenceDesignTokens.NAVY_DARK)
         }
     }
 
-    fun actionAt(x: Float, y: Float): ScreenAction = hits.lastOrNull { it.first.contains(x, y) }?.second ?: ScreenAction.None
+    fun actionAt(x: Float, y: Float): ScreenAction =
+        hits.lastOrNull { it.first.contains(x, y) }?.second ?: ScreenAction.None
+
+    private fun cardColor(type: PowerUpType): Int = when (type) {
+        PowerUpType.SECOND_CHANCE -> 0xFFFFD04B.toInt()
+        PowerUpType.SLOW_TIME -> 0xFFAD67F2.toInt()
+        PowerUpType.WIDE_PERFECT -> 0xFF40A9F5.toInt()
+        PowerUpType.COIN_MULTIPLIER -> 0xFFF75BA0.toInt()
+    }
 
     private fun title(type: PowerUpType): String = when (type) {
         PowerUpType.SECOND_CHANCE -> "İKİNCİ ŞANS"
@@ -86,16 +99,47 @@ class PowerUpsScreen(private val kit: SkyVisualKit) {
     }
 
     private fun description(type: PowerUpType): String = when (type) {
-        PowerUpType.SECOND_CHANCE -> "İlk hatada otomatik kurtarır"
-        PowerUpType.SLOW_TIME -> "8 sn boyunca hızı %35 azaltır"
-        PowerUpType.WIDE_PERFECT -> "8 sn PERFECT alanını 1.75x yapar"
-        PowerUpType.COIN_MULTIPLIER -> "Koşu coin ödülünü 2x yapar"
+        PowerUpType.SECOND_CHANCE -> "Düştüğünde kaldığın yerden devam et"
+        PowerUpType.SLOW_TIME -> "8 saniye boyunca hareketi yavaşlat"
+        PowerUpType.WIDE_PERFECT -> "PERFECT alanını geçici olarak genişlet"
+        PowerUpType.COIN_MULTIPLIER -> "Koşu coin ödülünü 2 katına çıkar"
     }
 
-    private fun icon(type: PowerUpType): String = when (type) {
-        PowerUpType.SECOND_CHANCE -> "↻"
+    private fun drawIcon(canvas: Canvas, type: PowerUpType, cx: Float, cy: Float, s: Float) {
+        when (type) {
+            PowerUpType.SECOND_CHANCE -> {
+                kit.paint.color = 0xFFFF5362.toInt()
+                canvas.drawCircle(cx, cy, 64f*s, kit.paint)
+                kit.drawOutlinedTitle(canvas, "∞", cx, cy+20f*s, 58f*s, Color.WHITE, 0xFFA62A34.toInt())
+            }
+            PowerUpType.SLOW_TIME -> {
+                kit.paint.color = Color.WHITE
+                canvas.drawCircle(cx, cy, 63f*s, kit.paint)
+                kit.paint.style = android.graphics.Paint.Style.STROKE
+                kit.paint.strokeWidth = 8f*s
+                kit.paint.color = ReferenceDesignTokens.BLUE_DARK
+                canvas.drawCircle(cx, cy, 51f*s, kit.paint)
+                canvas.drawLine(cx, cy, cx, cy-28f*s, kit.paint)
+                canvas.drawLine(cx, cy, cx+23f*s, cy+13f*s, kit.paint)
+                kit.paint.style = android.graphics.Paint.Style.FILL
+            }
+            PowerUpType.WIDE_PERFECT -> {
+                kit.paint.color = 0xFFF14E65.toInt()
+                canvas.drawRoundRect(RectF(cx-70f*s, cy-28f*s, cx+70f*s, cy+28f*s), 14f*s, 14f*s, kit.paint)
+                kit.drawOutlinedTitle(canvas, "↔", cx, cy+17f*s, 56f*s, Color.WHITE)
+            }
+            PowerUpType.COIN_MULTIPLIER -> {
+                kit.drawCoin(canvas, cx-32f*s, cy+10f*s, 38f*s)
+                kit.drawCoin(canvas, cx+23f*s, cy-22f*s, 40f*s)
+                kit.drawOutlinedTitle(canvas, "×2", cx+15f*s, cy+62f*s, 44f*s, ReferenceDesignTokens.GOLD)
+            }
+        }
+    }
+
+    private fun shortIcon(type: PowerUpType): String = when (type) {
+        PowerUpType.SECOND_CHANCE -> "∞"
         PowerUpType.SLOW_TIME -> "◷"
-        PowerUpType.WIDE_PERFECT -> "★"
+        PowerUpType.WIDE_PERFECT -> "↔"
         PowerUpType.COIN_MULTIPLIER -> "×2"
     }
 
