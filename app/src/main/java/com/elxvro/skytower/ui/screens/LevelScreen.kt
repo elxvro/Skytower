@@ -1,10 +1,14 @@
 package com.elxvro.skytower.ui.screens
 
 import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.RectF
 import com.elxvro.skytower.game.LevelRules
 import com.elxvro.skytower.platform.PlayerProgress
 import com.elxvro.skytower.ui.ItemActionState
+import com.elxvro.skytower.ui.ReferenceDesignTokens
 import com.elxvro.skytower.ui.ScreenInteractionState
 import com.elxvro.skytower.ui.ScreenLayout
 import com.elxvro.skytower.ui.SkyVisualKit
@@ -17,51 +21,112 @@ class LevelScreen(private val kit: SkyVisualKit) {
         hits.clear()
         val l = ScreenLayout(canvas.width.toFloat(), canvas.height.toFloat())
         val s = l.scale
-        kit.drawSky(canvas, canvas.width.toFloat(), canvas.height.toFloat())
-        kit.drawLogo(canvas, canvas.width.toFloat(), 145f * s)
-        val back = l.referenceRect(45f, 60f, 110f, 90f)
-        kit.drawBack(canvas, back.rf()); hits += back to ScreenAction.Back
-        kit.drawCoinCapsule(canvas, l.referenceRect(815f, 65f, 220f, 82f).rf(), progress.coins)
-        kit.drawRibbon(canvas, l.referenceRect(250f, 285f, 580f, 105f).rf(), "SEVİYE")
-
-        val panel = l.referenceRect(70f, 420f, 940f, 1290f)
-        kit.drawPanel(canvas, panel.rf())
         val levelState = LevelRules.levelForXp(progress.totalXp)
-        val hero = l.referenceRect(115f, 475f, 850f, 245f)
-        kit.drawBlueCard(canvas, hero.rf(), 0xFF315FC1.toInt())
-        kit.drawTitle(canvas, "SEVİYE", hero.centerX(), hero.top + 55f * s, 31f * s, 0xFFE5F4FF.toInt())
-        kit.drawTitle(canvas, levelState.level.toString(), hero.centerX(), hero.top + 140f * s, 80f * s, 0xFFFFD54A.toInt())
-        val xpRect = RectF(hero.left + 95f * s, hero.bottom - 58f * s, hero.right - 95f * s, hero.bottom - 25f * s)
-        kit.drawProgress(canvas, xpRect, levelState.xpIntoLevel.toFloat() / levelState.xpRequired.toFloat(), 0xFFFFCB3D.toInt())
-        kit.drawTitle(canvas, "${levelState.xpIntoLevel} / ${levelState.xpRequired} XP", xpRect.centerX(), xpRect.top - 12f * s, 23f * s, 0xFFFFFFFF.toInt())
 
-        kit.drawTitle(canvas, "SEVİYE ÖDÜLLERİ", canvas.width * .5f, 780f * s, 34f * s)
-        val firstRewardLevel = maxOf(2, levelState.level - 1)
-        for (slot in 0 until 4) {
-            val rewardLevel = firstRewardLevel + slot
-            val y = 820f + slot * 185f
-            val card = l.referenceRect(115f, y, 850f, 155f)
-            kit.drawBlueCard(canvas, card.rf(), if (rewardLevel == levelState.level) 0xFF684FD1.toInt() else 0xFF2D70C7.toInt())
-            kit.drawTitle(canvas, "SEVİYE $rewardLevel", card.left + 150f * s, card.centerY() + 8f * s, 28f * s, 0xFFFFFFFF.toInt())
-            val reward = LevelRules.rewardForLevel(rewardLevel)
-            val rewardText = if (reward.coins > 0) "+${reward.coins} COIN" else "+${reward.quantity} ${reward.powerUp?.name?.replace('_', ' ') ?: "ÖDÜL"}"
-            kit.drawTitle(canvas, rewardText, card.left + 405f * s, card.centerY() + 8f * s, 25f * s, 0xFFFFD54A.toInt())
-            val button = UiRect(card.right - 215f * s, card.top + 40f * s, card.right - 30f * s, card.bottom - 35f * s)
-            when (ScreenInteractionState.level(levelState.level, rewardLevel, rewardLevel in progress.claimedLevelRewards)) {
-                ItemActionState.CLAIM -> kit.drawButton(canvas, button.rf(), "TOPLA", green = true)
-                ItemActionState.CLAIMED -> kit.drawButton(canvas, button.rf(), "ALINDI", enabled = false, green = true)
-                else -> kit.drawButton(canvas, button.rf(), "KİLİTLİ", enabled = false, green = false)
+        kit.drawSky(canvas, canvas.width.toFloat(), canvas.height.toFloat())
+        val back = l.referenceRect(32f, 42f, 95f, 86f)
+        kit.drawBack(canvas, back.rf()); hits += back to ScreenAction.Back
+        kit.drawCoinCapsule(canvas, l.referenceRect(185f, 44f, 275f, 82f).rf(), progress.coins)
+        kit.drawLevelCapsule(canvas, l.referenceRect(770f, 44f, 275f, 82f).rf(), levelState.level, levelState.xpIntoLevel.toFloat()/levelState.xpRequired.toFloat())
+        kit.drawRibbon(canvas, l.referenceRect(205f, 175f, 670f, 120f).rf(), "SEVİYE")
+
+        drawLevelShield(canvas, l, levelState.level)
+
+        val xpPanel = l.referenceRect(65f, 565f, 950f, 185f)
+        kit.drawPanel(canvas, xpPanel.rf())
+        kit.text.textAlign = Paint.Align.LEFT
+        kit.drawOutlinedTitle(canvas, levelState.xpIntoLevel.toString(), xpPanel.left+42f*s, xpPanel.top+58f*s, 52f*s, ReferenceDesignTokens.GOLD)
+        kit.drawTitle(canvas, "/ ${levelState.xpRequired} XP", xpPanel.left+210f*s, xpPanel.top+55f*s, 31f*s, ReferenceDesignTokens.TEXT)
+        kit.text.textAlign = Paint.Align.CENTER
+        val bar = RectF(xpPanel.left+35f*s, xpPanel.top+88f*s, xpPanel.right-35f*s, xpPanel.top+132f*s)
+        kit.drawProgress(canvas, bar, levelState.xpIntoLevel.toFloat()/levelState.xpRequired.toFloat(), ReferenceDesignTokens.GOLD)
+        val remaining = (levelState.xpRequired-levelState.xpIntoLevel).coerceAtLeast(0)
+        kit.drawTitle(canvas, "Sonraki seviyeye $remaining XP kaldı!", xpPanel.centerX, xpPanel.bottom-15f*s, 23f*s, ReferenceDesignTokens.TEXT)
+
+        val firstRewardLevel = maxOf(1, levelState.level-2)
+        repeat(6) { slot ->
+            val rewardLevel = firstRewardLevel+slot
+            val y = 790f+slot*145f
+            val row = l.referenceRect(65f, y, 950f, 125f)
+            val relation = when {
+                rewardLevel < levelState.level -> -1
+                rewardLevel == levelState.level -> 0
+                else -> 1
             }
-            hits += button to ScreenAction.ClaimLevel(rewardLevel)
-        }
+            val claimed = rewardLevel in progress.claimedLevelRewards
+            when {
+                relation < 0 || claimed -> kit.drawLightCard(canvas, row.rf(), highlighted = false)
+                relation == 0 -> kit.drawLightCard(canvas, row.rf(), highlighted = true)
+                else -> kit.drawLightCard(canvas, row.rf(), highlighted = false)
+            }
 
-        val stats = l.referenceRect(115f, 1580f, 850f, 105f)
-        kit.drawBlueCard(canvas, stats.rf(), 0xFF214F99.toInt())
-        kit.drawTitle(canvas, "OYUN ${progress.totalRuns}", stats.left + 145f * s, stats.centerY() + 8f * s, 24f * s, 0xFFFFFFFF.toInt())
-        kit.drawTitle(canvas, "REKOR ${progress.bestScore}", stats.centerX(), stats.centerY() + 8f * s, 24f * s, 0xFFFFFFFF.toInt())
-        kit.drawTitle(canvas, "PERFECT ${progress.totalPerfects}", stats.right - 150f * s, stats.centerY() + 8f * s, 24f * s, 0xFFFFFFFF.toInt())
+            val badgeColor = when {
+                claimed -> ReferenceDesignTokens.ACTION_GREEN
+                relation == 0 -> ReferenceDesignTokens.GOLD
+                else -> 0xFF8196BA.toInt()
+            }
+            kit.paint.color = badgeColor
+            canvas.drawCircle(row.left+62f*s, row.centerY, 39f*s, kit.paint)
+            if (claimed) kit.drawCheck(canvas, row.left+62f*s, row.centerY, 38f*s, Color.WHITE)
+            else kit.drawTitle(canvas, rewardLevel.toString(), row.left+62f*s, row.centerY+13f*s, 31f*s, if (relation==0) ReferenceDesignTokens.NAVY_DARK else Color.WHITE)
+
+            kit.text.textAlign = Paint.Align.LEFT
+            kit.drawTitle(canvas, "Sv. $rewardLevel", row.left+128f*s, row.top+48f*s, 29f*s, ReferenceDesignTokens.TEXT)
+            val reward = LevelRules.rewardForLevel(rewardLevel)
+            val rewardText = if (reward.coins>0) "${reward.coins} ALTIN" else reward.powerUp?.let { "+${reward.quantity} ${powerName(it.name)}" } ?: "ÖZEL ÖDÜL"
+            kit.drawTitle(canvas, rewardText, row.left+360f*s, row.centerY+10f*s, 27f*s, ReferenceDesignTokens.TEXT)
+            kit.text.textAlign = Paint.Align.CENTER
+
+            val action = UiRect(row.right-230f*s, row.top+25f*s, row.right-28f*s, row.bottom-25f*s)
+            when (ScreenInteractionState.level(levelState.level, rewardLevel, claimed)) {
+                ItemActionState.CLAIM -> {
+                    kit.drawButton(canvas, action.rf(), "ŞİMDİ AL", green = true)
+                    hits += action to ScreenAction.ClaimLevel(rewardLevel)
+                }
+                ItemActionState.CLAIMED -> kit.drawButton(canvas, action.rf(), "ALINDI", enabled = false, green = true)
+                else -> kit.drawButton(canvas, action.rf(), "KİLİTLİ", enabled = false, green = false)
+            }
+        }
     }
 
     fun actionAt(x: Float, y: Float): ScreenAction = hits.lastOrNull { it.first.contains(x, y) }?.second ?: ScreenAction.None
+
+    private fun drawLevelShield(canvas: Canvas, l: ScreenLayout, level: Int) {
+        val s = l.scale
+        val cx = l.viewportWidth*.5f
+        val top = 315f*s
+        val shield = Path().apply {
+            moveTo(cx-130f*s, top+18f*s)
+            lineTo(cx+130f*s, top+18f*s)
+            lineTo(cx+112f*s, top+160f*s)
+            lineTo(cx, top+235f*s)
+            lineTo(cx-112f*s, top+160f*s)
+            close()
+        }
+        kit.paint.color = ReferenceDesignTokens.GOLD
+        canvas.drawPath(shield, kit.paint)
+        val inner = Path().apply {
+            moveTo(cx-106f*s, top+37f*s)
+            lineTo(cx+106f*s, top+37f*s)
+            lineTo(cx+90f*s, top+145f*s)
+            lineTo(cx, top+205f*s)
+            lineTo(cx-90f*s, top+145f*s)
+            close()
+        }
+        kit.paint.color = ReferenceDesignTokens.BLUE
+        canvas.drawPath(inner, kit.paint)
+        kit.drawCrown(canvas, cx, top+38f*s, 39f*s)
+        kit.drawTitle(canvas, "Sv.", cx, top+108f*s, 40f*s, Color.WHITE)
+        kit.drawOutlinedTitle(canvas, level.toString(), cx, top+177f*s, 74f*s, ReferenceDesignTokens.GOLD)
+    }
+
+    private fun powerName(raw: String): String = when (raw) {
+        "SECOND_CHANCE" -> "İKİNCİ ŞANS"
+        "SLOW_TIME" -> "YAVAŞ ZAMAN"
+        "WIDE_PERFECT" -> "GENİŞ PERFECT"
+        "COIN_MULTIPLIER" -> "COIN ÇARPANI"
+        else -> raw.replace('_',' ')
+    }
+
     private fun UiRect.rf(): RectF = RectF(left, top, right, bottom)
 }
