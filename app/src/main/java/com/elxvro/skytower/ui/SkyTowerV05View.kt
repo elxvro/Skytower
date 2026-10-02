@@ -11,6 +11,7 @@ import android.view.SurfaceView
 import com.elxvro.skytower.game.Block
 import com.elxvro.skytower.game.BlockSkin
 import com.elxvro.skytower.game.GameEngine
+import com.elxvro.skytower.game.LevelRules
 import com.elxvro.skytower.game.PlacementResult
 import com.elxvro.skytower.game.PowerUpType
 import com.elxvro.skytower.game.RunMode
@@ -26,9 +27,9 @@ import com.elxvro.skytower.ui.screens.HomeScreen
 import com.elxvro.skytower.ui.screens.LevelScreen
 import com.elxvro.skytower.ui.screens.PowerUpsScreen
 import com.elxvro.skytower.ui.screens.ScreenAction
+import com.elxvro.skytower.ui.screens.SettingsScreen
 import com.elxvro.skytower.ui.screens.ThemeShopScreen
 import kotlin.math.max
-import kotlin.math.min
 
 class SkyTowerV05View(context: Context) : SurfaceView(context), SurfaceHolder.Callback, Runnable {
     private val stateLock = Any()
@@ -43,6 +44,7 @@ class SkyTowerV05View(context: Context) : SurfaceView(context), SurfaceHolder.Ca
     private val levelScreen = LevelScreen(kit)
     private val skinsScreen = BlockSkinsScreen(kit, blockRenderer)
     private val powerScreen = PowerUpsScreen(kit)
+    private val settingsScreen = SettingsScreen(kit)
     private val hud = GameplayHudRenderer(kit)
     private val overlayPaint = Paint(Paint.ANTI_ALIAS_FLAG)
 
@@ -185,6 +187,7 @@ class SkyTowerV05View(context: Context) : SurfaceView(context), SurfaceHolder.Ca
             AppScreen.LEVELS -> levelScreen.draw(canvas, progress)
             AppScreen.BLOCK_SKINS -> skinsScreen.draw(canvas, progress)
             AppScreen.POWER_UPS -> powerScreen.draw(canvas, progress)
+            AppScreen.SETTINGS -> settingsScreen.draw(canvas, progress)
             AppScreen.GAMEPLAY -> drawGameplay(canvas)
         }
     }
@@ -201,6 +204,7 @@ class SkyTowerV05View(context: Context) : SurfaceView(context), SurfaceHolder.Ca
             AppScreen.LEVELS -> levelScreen.actionAt(x, y)
             AppScreen.BLOCK_SKINS -> skinsScreen.actionAt(x, y)
             AppScreen.POWER_UPS -> powerScreen.actionAt(x, y)
+            AppScreen.SETTINGS -> settingsScreen.actionAt(x, y)
             AppScreen.GAMEPLAY -> ScreenAction.None
         }
         handleScreenAction(action)
@@ -220,6 +224,12 @@ class SkyTowerV05View(context: Context) : SurfaceView(context), SurfaceHolder.Ca
                 refreshProgress()
                 haptics.placed(progress.vibrationEnabled, false)
             }
+            ScreenAction.ToggleTutorial -> {
+                preferences.tutorialSeen = !progress.tutorialSeen
+                refreshProgress()
+                sound.menu(progress.soundEnabled)
+            }
+            ScreenAction.ResetData -> Unit
             is ScreenAction.Open -> {
                 if (action.screen == AppScreen.GAMEPLAY) beginRun() else screen = action.screen
                 sound.menu(progress.soundEnabled)
@@ -378,8 +388,8 @@ class SkyTowerV05View(context: Context) : SurfaceView(context), SurfaceHolder.Ca
     private fun handlePausedTap(x: Float, y: Float, active: GameEngine) {
         val l = ScreenLayout(width.toFloat(), height.toFloat())
         when {
-            l.referenceRect(210f, 790f, 660f, 125f).contains(x, y) -> active.resume()
-            l.referenceRect(210f, 950f, 660f, 125f).contains(x, y) -> restartRun()
+            l.referenceRect(210f, 800f, 660f, 125f).contains(x, y) -> active.resume()
+            l.referenceRect(210f, 955f, 660f, 125f).contains(x, y) -> restartRun()
             l.referenceRect(210f, 1110f, 660f, 125f).contains(x, y) -> {
                 active.returnToMenu()
                 screen = AppScreen.HOME
@@ -392,8 +402,8 @@ class SkyTowerV05View(context: Context) : SurfaceView(context), SurfaceHolder.Ca
     private fun handleGameOverTap(x: Float, y: Float) {
         val l = ScreenLayout(width.toFloat(), height.toFloat())
         when {
-            l.referenceRect(210f, 1180f, 660f, 130f).contains(x, y) -> restartRun()
-            l.referenceRect(210f, 1345f, 660f, 120f).contains(x, y) -> {
+            l.referenceRect(70f, 1570f, 455f, 135f).contains(x, y) -> restartRun()
+            l.referenceRect(555f, 1570f, 455f, 135f).contains(x, y) -> {
                 engine?.returnToMenu()
                 screen = AppScreen.HOME
                 refreshProgress()
@@ -412,17 +422,21 @@ class SkyTowerV05View(context: Context) : SurfaceView(context), SurfaceHolder.Ca
             if (PowerUpType.SLOW_TIME in runEquipped && (PowerUpType.SLOW_TIME !in consumedRunPowerUps || runPowerUps.slowTimeRemaining > 0f)) add(PowerUpType.SLOW_TIME)
             if (PowerUpType.WIDE_PERFECT in runEquipped && (PowerUpType.WIDE_PERFECT !in consumedRunPowerUps || runPowerUps.widePerfectRemaining > 0f)) add(PowerUpType.WIDE_PERFECT)
         }
+        val levelState = LevelRules.levelForXp(progress.totalXp)
         hud.draw(
             canvas,
             GameplayHudState(
                 score = active.score,
                 bestScore = max(progress.bestScore, active.score),
                 coins = progress.coins,
+                level = levelState.level,
+                levelProgress = levelState.xpIntoLevel.toFloat() / levelState.xpRequired.toFloat(),
                 placements = runPlacements,
                 combo = active.combo,
                 perfectIntensity = perfectFlash,
                 runPowerUps = runPowerUps,
                 equipped = visiblePowerUps,
+                inventory = progress.powerUpInventory,
             ),
         )
 
@@ -435,43 +449,39 @@ class SkyTowerV05View(context: Context) : SurfaceView(context), SurfaceHolder.Ca
     }
 
     private fun drawTower(canvas: Canvas, active: GameEngine, theme: SkyTheme) {
-        val groundY = canvas.height * .83f
+        val groundY = canvas.height * .80f
         val camera = active.cameraOffsetY
-        val blocks = active.placedBlocks
-        for (block in blocks) drawBlock(canvas, block, groundY, camera, theme)
+        for (block in active.placedBlocks) drawBlock(canvas, block, groundY, camera, theme)
         active.movingBlock?.let { drawBlock(canvas, it, groundY, camera, theme) }
 
-        overlayPaint.color = 0x55315F83
-        canvas.drawOval(
-            RectF(canvas.width * .22f, groundY + 12f, canvas.width * .78f, groundY + 54f),
-            overlayPaint,
-        )
+        overlayPaint.color = 0x44315F83
+        canvas.drawOval(RectF(canvas.width*.22f, groundY+12f, canvas.width*.78f, groundY+54f), overlayPaint)
     }
 
     private fun drawBlock(canvas: Canvas, block: Block, groundY: Float, camera: Float, theme: SkyTheme) {
         val bottom = groundY - (block.y - camera)
-        val rect = RectF(block.x, bottom - block.height, block.x + block.width, bottom)
-        if (rect.bottom < -block.height || rect.top > canvas.height + block.height) return
+        val rect = RectF(block.x, bottom-block.height, block.x+block.width, bottom)
+        if (rect.bottom < -block.height || rect.top > canvas.height+block.height) return
         val color = theme.blocks[Math.floorMod(block.paletteIndex, theme.blocks.size)]
         blockRenderer.draw(canvas, rect, color, runSkin)
     }
 
     private fun drawTutorial(canvas: Canvas) {
         val l = ScreenLayout(canvas.width.toFloat(), canvas.height.toFloat())
-        val panel = l.referenceRect(170f, 1450f, 740f, 180f)
-        kit.drawBlueCard(canvas, panel.toRectF(), 0xDD183F82.toInt())
-        kit.drawTitle(canvas, "DOKUN VE BLOĞU YERLEŞTİR", panel.centerX, panel.top + 72f * l.scale, 31f * l.scale, Color.WHITE)
-        kit.drawTitle(canvas, "Taşan kısım kesilir — PERFECT için hizala", panel.centerX, panel.top + 125f * l.scale, 22f * l.scale, 0xFFD9EEFF.toInt())
+        val panel = l.referenceRect(160f, 1370f, 760f, 170f)
+        kit.drawBlueCard(canvas, panel.toRectF(), 0xEA173F82.toInt())
+        kit.drawTitle(canvas, "DOKUN VE BLOĞU YERLEŞTİR", panel.centerX, panel.top+65f*l.scale, 31f*l.scale, Color.WHITE)
+        kit.drawTitle(canvas, "PERFECT için blokları tam hizala", panel.centerX, panel.top+118f*l.scale, 23f*l.scale, 0xFFD9EEFF.toInt())
     }
 
     private fun drawPauseOverlay(canvas: Canvas) {
         drawDim(canvas)
         val l = ScreenLayout(canvas.width.toFloat(), canvas.height.toFloat())
-        val panel = l.referenceRect(140f, 590f, 800f, 760f)
+        val panel = l.referenceRect(135f, 550f, 810f, 760f)
         kit.drawPanel(canvas, panel.toRectF())
-        kit.drawRibbon(canvas, l.referenceRect(280f, 630f, 520f, 105f).toRectF(), "DURAKLATILDI")
-        kit.drawButton(canvas, l.referenceRect(210f, 790f, 660f, 125f).toRectF(), "DEVAM ET", green = true)
-        kit.drawButton(canvas, l.referenceRect(210f, 950f, 660f, 125f).toRectF(), "YENİDEN BAŞLAT", green = false)
+        kit.drawRibbon(canvas, l.referenceRect(250f, 585f, 580f, 112f).toRectF(), "DURAKLATILDI", ReferenceDesignTokens.BLUE, ReferenceDesignTokens.BLUE_DARK)
+        kit.drawButton(canvas, l.referenceRect(210f, 800f, 660f, 125f).toRectF(), "DEVAM ET", green = true)
+        kit.drawButton(canvas, l.referenceRect(210f, 955f, 660f, 125f).toRectF(), "YENİDEN BAŞLAT", green = false)
         kit.drawButton(canvas, l.referenceRect(210f, 1110f, 660f, 125f).toRectF(), "ANA MENÜ", green = false)
     }
 
@@ -479,16 +489,36 @@ class SkyTowerV05View(context: Context) : SurfaceView(context), SurfaceHolder.Ca
         if (!runSettled) settleRun(active)
         drawDim(canvas)
         val l = ScreenLayout(canvas.width.toFloat(), canvas.height.toFloat())
-        val panel = l.referenceRect(120f, 500f, 840f, 1040f)
-        kit.drawPanel(canvas, panel.toRectF())
-        kit.drawRibbon(canvas, l.referenceRect(260f, 545f, 560f, 105f).toRectF(), "OYUN BİTTİ")
-        kit.drawTitle(canvas, if (newRecord) "YENİ REKOR!" else "SKOR", panel.centerX, 735f * l.scale, 34f * l.scale, if (newRecord) 0xFFFFC928.toInt() else 0xFF123B75.toInt())
-        kit.drawTitle(canvas, active.score.toString(), panel.centerX, 865f * l.scale, 104f * l.scale, 0xFF1957A4.toInt())
-        kit.drawTitle(canvas, "+$lastRunCoins COIN", panel.centerX - 180f * l.scale, 1010f * l.scale, 30f * l.scale, 0xFFE29A00.toInt())
-        kit.drawTitle(canvas, "+$lastRunXp XP", panel.centerX + 180f * l.scale, 1010f * l.scale, 30f * l.scale, 0xFF644BC7.toInt())
-        if (runCoinMultiplier) kit.drawTitle(canvas, "COIN ÇARPANI AKTİF ×2", panel.centerX, 1080f * l.scale, 24f * l.scale, 0xFF2E8D43.toInt())
-        kit.drawButton(canvas, l.referenceRect(210f, 1180f, 660f, 130f).toRectF(), "TEKRAR OYNA", green = true)
-        kit.drawButton(canvas, l.referenceRect(210f, 1345f, 660f, 120f).toRectF(), "ANA MENÜ", green = false)
+        val s = l.scale
+        val panel = l.referenceRect(100f, 360f, 880f, 1170f)
+        kit.drawPanel(canvas, panel.toRectF(), 0xFFFFFBF3.toInt())
+        kit.drawOutlinedTitle(canvas, "OYUN", panel.centerX, 470f*s, 70f*s, Color.WHITE)
+        kit.drawOutlinedTitle(canvas, "SONU", panel.centerX, 555f*s, 78f*s, ReferenceDesignTokens.GOLD)
+
+        val hero = l.referenceRect(155f, 610f, 770f, 180f)
+        kit.drawLightCard(canvas, hero.toRectF())
+        kit.drawCrown(canvas, hero.left+105f*s, hero.centerY, 50f*s)
+        kit.drawTitle(canvas, if (newRecord) "YENİ REKOR" else "SKORUN", hero.left+290f*s, hero.centerY+12f*s, 31f*s)
+        kit.drawOutlinedTitle(canvas, active.score.toString(), hero.right-150f*s, hero.centerY+18f*s, 64f*s, ReferenceDesignTokens.GOLD)
+
+        val rows = listOf(
+            Triple("EN İYİ SKOR", progress.bestScore.toString(), ReferenceDesignTokens.GOLD),
+            Triple("KAZANILAN ALTIN", lastRunCoins.toString(), ReferenceDesignTokens.ORANGE),
+            Triple("KOMBO SERİSİ", active.combo.toString(), ReferenceDesignTokens.PURPLE),
+            Triple("KAZANILAN XP", lastRunXp.toString(), ReferenceDesignTokens.BLUE),
+        )
+        rows.forEachIndexed { index, row ->
+            val r = l.referenceRect(170f, 825f+index*135f, 740f, 110f)
+            kit.drawLightCard(canvas, r.toRectF())
+            kit.text.textAlign = Paint.Align.LEFT
+            kit.drawTitle(canvas, row.first, r.left+40f*s, r.centerY+10f*s, 27f*s, ReferenceDesignTokens.TEXT)
+            kit.text.textAlign = Paint.Align.CENTER
+            kit.drawOutlinedTitle(canvas, row.second, r.right-80f*s, r.centerY+13f*s, 39f*s, row.third)
+        }
+        if (runCoinMultiplier) kit.drawTitle(canvas, "COIN ÇARPANI ×2 AKTİF", panel.centerX, 1410f*s, 24f*s, ReferenceDesignTokens.ACTION_GREEN_DARK)
+
+        kit.drawButton(canvas, l.referenceRect(70f, 1570f, 455f, 135f).toRectF(), "TEKRAR OYNA", green = true)
+        kit.drawButton(canvas, l.referenceRect(555f, 1570f, 455f, 135f).toRectF(), "ANA MENÜ", green = false)
     }
 
     private fun drawDim(canvas: Canvas) {
