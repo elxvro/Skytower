@@ -28,7 +28,7 @@ class BlockSkinsScreen(
         val back = l.referenceRect(45f, 60f, 110f, 90f)
         kit.drawBack(canvas, back.rf()); hits += back to ScreenAction.Back
         kit.drawCoinCapsule(canvas, l.referenceRect(815f, 65f, 220f, 82f).rf(), progress.coins)
-        kit.drawRibbon(canvas, l.referenceRect(250f, 285f, 580f, 105f).rf(), "BLOK SKİNLERİ")
+        kit.drawRibbon(canvas, l.referenceRect(250f, 285f, 580f, 105f).rf(), "SKİNLER")
 
         val panel = l.referenceRect(70f, 420f, 940f, 1290f)
         kit.drawPanel(canvas, panel.rf())
@@ -51,9 +51,9 @@ class BlockSkinsScreen(
             kit.drawTitle(canvas, skinName(skin), card.centerX, card.top + 142f*s, 27f*s, 0xFFFFFFFF.toInt())
             val button = UiRect(card.left + 50f*s, card.top + 160f*s, card.right - 50f*s, card.bottom - 18f*s)
             when (InventoryInteractionState.skin(skin, progress.selectedSkin, progress.unlockedSkinMask, progress.coins)) {
-                ItemActionState.SELECTED -> kit.drawButton(canvas, button.rf(), "SEÇİLİ", enabled = false, green = false)
+                ItemActionState.SELECTED -> kit.drawButton(canvas, button.rf(), "KULLANILIYOR", enabled = false, green = true)
                 ItemActionState.SELECT -> kit.drawButton(canvas, button.rf(), "SEÇ", green = true)
-                ItemActionState.BUY -> kit.drawButton(canvas, button.rf(), "${SkinRules.price(skin)} COIN", green = true)
+                ItemActionState.BUY -> kit.drawButton(canvas, button.rf(), "AÇ • ${SkinRules.price(skin)}", green = true)
                 ItemActionState.LOCKED -> kit.drawPrice(canvas, button.rf(), SkinRules.price(skin), locked = true)
                 else -> Unit
             }
