@@ -5,17 +5,17 @@ import android.content.pm.ActivityInfo
 import android.os.Bundle
 import android.view.View
 import android.view.WindowManager
-import com.elxvro.skytower.ui.SkyTowerView
+import com.elxvro.skytower.ui.SkyTowerV05View
 
 class MainActivity : Activity() {
-    private lateinit var gameView: SkyTowerView
+    private lateinit var gameView: SkyTowerV05View
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         applyImmersiveMode()
-        gameView = SkyTowerView(this)
+        gameView = SkyTowerV05View(this)
         setContentView(gameView)
     }
 
