@@ -1,6 +1,8 @@
 package com.elxvro.skytower.ui.screens
 
 import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
 import android.graphics.RectF
 import com.elxvro.skytower.game.BlockSkin
 import com.elxvro.skytower.game.SkinRules
@@ -8,6 +10,7 @@ import com.elxvro.skytower.platform.PlayerProgress
 import com.elxvro.skytower.ui.BlockSkinRenderer
 import com.elxvro.skytower.ui.InventoryInteractionState
 import com.elxvro.skytower.ui.ItemActionState
+import com.elxvro.skytower.ui.ReferenceDesignTokens
 import com.elxvro.skytower.ui.ScreenLayout
 import com.elxvro.skytower.ui.SkyVisualKit
 import com.elxvro.skytower.ui.ThemePalette
@@ -24,32 +27,32 @@ class BlockSkinsScreen(
         val l = ScreenLayout(canvas.width.toFloat(), canvas.height.toFloat())
         val s = l.scale
         kit.drawSky(canvas, canvas.width.toFloat(), canvas.height.toFloat())
-        kit.drawLogo(canvas, canvas.width.toFloat(), 145f * s)
-        val back = l.referenceRect(45f, 60f, 110f, 90f)
+        val back = l.referenceRect(32f, 42f, 95f, 86f)
         kit.drawBack(canvas, back.rf()); hits += back to ScreenAction.Back
-        kit.drawCoinCapsule(canvas, l.referenceRect(815f, 65f, 220f, 82f).rf(), progress.coins)
-        kit.drawRibbon(canvas, l.referenceRect(250f, 285f, 580f, 105f).rf(), "SKİNLER")
-
-        val panel = l.referenceRect(70f, 420f, 940f, 1290f)
-        kit.drawPanel(canvas, panel.rf())
-        val hero = l.referenceRect(120f, 470f, 840f, 300f)
-        kit.drawBlueCard(canvas, hero.rf(), 0xFF2D70C7.toInt())
-        kit.drawTitle(canvas, "SEÇİLİ SKİN", hero.centerX, hero.top + 50f * s, 29f * s, 0xFFDFF3FF.toInt())
-        val heroBlock = RectF(hero.left + 145f*s, hero.top + 90f*s, hero.right - 145f*s, hero.bottom - 65f*s)
-        renderer.draw(canvas, heroBlock, ThemePalette.get(progress.themeId).blocks[0], progress.selectedSkin)
-        kit.drawTitle(canvas, skinName(progress.selectedSkin), hero.centerX, hero.bottom - 20f*s, 31f*s, 0xFFFFFFFF.toInt())
+        kit.drawCoinCapsule(canvas, l.referenceRect(770f, 44f, 275f, 82f).rf(), progress.coins)
+        kit.drawRibbon(canvas, l.referenceRect(200f, 180f, 680f, 125f).rf(), "SKİNLER")
 
         BlockSkin.entries.forEachIndexed { index, skin ->
-            val col = index % 2
-            val row = index / 2
-            val x = 120f + col * 420f
-            val y = 820f + row * 250f
-            val card = l.referenceRect(x, y, 390f, 225f)
-            kit.drawBlueCard(canvas, card.rf(), 0xFF286DC2.toInt())
-            val preview = RectF(card.left + 40f*s, card.top + 30f*s, card.right - 40f*s, card.top + 105f*s)
-            renderer.draw(canvas, preview, ThemePalette.get(progress.themeId).blocks[index % 6], skin)
-            kit.drawTitle(canvas, skinName(skin), card.centerX, card.top + 142f*s, 27f*s, 0xFFFFFFFF.toInt())
-            val button = UiRect(card.left + 50f*s, card.top + 160f*s, card.right - 50f*s, card.bottom - 18f*s)
+            val col = index % 3
+            val row = index / 3
+            val x = 45f + col * 345f
+            val y = 370f + row * 650f
+            val card = l.referenceRect(x, y, 300f, 590f)
+            val selected = progress.selectedSkin == skin
+            kit.drawBlueCard(canvas, card.rf(), 0xFF1776C9.toInt())
+            if (selected) {
+                kit.paint.style = Paint.Style.STROKE
+                kit.paint.strokeWidth = 8f*s
+                kit.paint.color = ReferenceDesignTokens.ACTION_GREEN
+                canvas.drawRoundRect(card.rf(), 34f*s, 34f*s, kit.paint)
+                kit.paint.style = Paint.Style.FILL
+            }
+            kit.drawOutlinedTitle(canvas, skinName(skin), card.centerX, card.top+65f*s, 35f*s, Color.WHITE)
+
+            val previewArea = RectF(card.left+35f*s, card.top+105f*s, card.right-35f*s, card.top+405f*s)
+            drawSkinTower(canvas, previewArea, progress.themeId, skin)
+
+            val button = UiRect(card.left+30f*s, card.bottom-105f*s, card.right-30f*s, card.bottom-25f*s)
             when (InventoryInteractionState.skin(skin, progress.selectedSkin, progress.unlockedSkinMask, progress.coins)) {
                 ItemActionState.SELECTED -> kit.drawButton(canvas, button.rf(), "KULLANILIYOR", enabled = false, green = true)
                 ItemActionState.SELECT -> kit.drawButton(canvas, button.rf(), "SEÇ", green = true)
@@ -62,6 +65,18 @@ class BlockSkinsScreen(
     }
 
     fun actionAt(x: Float, y: Float): ScreenAction = hits.lastOrNull { it.first.contains(x, y) }?.second ?: ScreenAction.None
+
+    private fun drawSkinTower(canvas: Canvas, area: RectF, themeId: Int, skin: BlockSkin) {
+        val palette = ThemePalette.get(themeId).blocks
+        val blocks = 6
+        val blockH = area.height()/blocks
+        for (i in 0 until blocks) {
+            val inset = (i%2)*area.width()*.025f
+            val bottom = area.bottom-i*blockH
+            val rect = RectF(area.left+inset, bottom-blockH+3f, area.right-inset, bottom)
+            renderer.draw(canvas, rect, palette[i%palette.size], skin)
+        }
+    }
 
     private fun skinName(skin: BlockSkin): String = when (skin) {
         BlockSkin.CLASSIC -> "KLASİK"
