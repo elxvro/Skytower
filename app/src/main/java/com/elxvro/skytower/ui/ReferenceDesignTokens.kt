@@ -1,8 +1,8 @@
 package com.elxvro.skytower.ui
 
 object ReferenceDesignTokens {
-    val SKY_TOP = 0xFF179CF4.toInt()
-    val SKY_BOTTOM = 0xFFDDF7FF.toInt()
+    val SKY_TOP = 0xFF4A9CF0.toInt()
+    val SKY_BOTTOM = 0xFFE3F6FD.toInt()
     val NAVY = 0xFF0D3F84.toInt()
     val NAVY_DARK = 0xFF082B61.toInt()
     val BLUE = 0xFF1689EA.toInt()
@@ -26,7 +26,7 @@ object ReferenceDesignTokens {
     val CYAN = 0xFF16CFC3.toInt()
     val DISABLED = 0xFFA7B8CD.toInt()
     val BORDER = 0xFF2D7DCC.toInt()
-    const val SHADOW = 0x42042B61
+    const val SHADOW = 0x00000000
 
     const val SCREEN_GUTTER_REF = 32f
     const val GRID_GAP_REF = 18f
