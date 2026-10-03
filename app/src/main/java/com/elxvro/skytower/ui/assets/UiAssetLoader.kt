@@ -25,3 +25,13 @@ class UiAssetLoader(private val assetManager: AssetManager) {
         cache.clear()
     }
 }
+
+object UiAssetRuntime {
+    @Volatile
+    var loader: UiAssetLoader? = null
+        private set
+
+    fun install(assetManager: AssetManager) {
+        loader = UiAssetLoader(assetManager)
+    }
+}
