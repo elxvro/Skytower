@@ -7,18 +7,10 @@ import java.util.Base64
 
 class UiAssetLoader(private val assetManager: AssetManager) {
     private val cache = mutableMapOf<String, Bitmap?>()
-    private var embeddedIndex: Map<String, String>? = null
-
-    private val embeddedPackPaths = listOf(
-        "ui/home/pack_core.txt",
-        "ui/home/pack_center.txt",
-        "ui/home/pack_cards_a.txt",
-        "ui/home/pack_cards_b.txt",
-    )
 
     fun bitmap(path: String): Bitmap? {
         if (cache.containsKey(path)) return cache[path]
-        val decoded = decodeDirect(path) ?: decodeEmbedded(path)
+        val decoded = decodeDirect(path) ?: decodeBase64Fallback(path)
         cache[path] = decoded
         return decoded
     }
@@ -29,29 +21,15 @@ class UiAssetLoader(private val assetManager: AssetManager) {
         null
     }
 
-    private fun decodeEmbedded(path: String): Bitmap? {
-        val encoded = embeddedAssets()[path] ?: return null
-        return try {
-            val bytes = Base64.getDecoder().decode(encoded)
-            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-        } catch (_: Exception) {
-            null
-        }
-    }
-
-    private fun embeddedAssets(): Map<String, String> {
-        embeddedIndex?.let { return it }
-        val loaded = linkedMapOf<String, String>()
-        embeddedPackPaths.forEach { packPath ->
-            val text = try {
-                assetManager.open(packPath).bufferedReader(Charsets.UTF_8).use { it.readText() }
-            } catch (_: Exception) {
-                null
-            }
-            if (text != null) loaded.putAll(UiEmbeddedAssetPack.parse(text))
-        }
-        embeddedIndex = loaded
-        return loaded
+    private fun decodeBase64Fallback(path: String): Bitmap? = try {
+        val encoded = assetManager.open("$path.b64")
+            .bufferedReader(Charsets.UTF_8)
+            .use { it.readText() }
+            .filterNot(Char::isWhitespace)
+        val bytes = Base64.getDecoder().decode(encoded)
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+    } catch (_: Exception) {
+        null
     }
 
     fun clear() {
@@ -59,7 +37,6 @@ class UiAssetLoader(private val assetManager: AssetManager) {
             if (!bitmap.isRecycled) bitmap.recycle()
         }
         cache.clear()
-        embeddedIndex = null
     }
 }
 
