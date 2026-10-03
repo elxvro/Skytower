@@ -11,6 +11,7 @@ import com.elxvro.skytower.ui.BlockSkinRenderer
 import com.elxvro.skytower.ui.InventoryInteractionState
 import com.elxvro.skytower.ui.ItemActionState
 import com.elxvro.skytower.ui.ReferenceDesignTokens
+import com.elxvro.skytower.ui.ReferenceStackRenderer
 import com.elxvro.skytower.ui.ScreenLayout
 import com.elxvro.skytower.ui.SkyVisualKit
 import com.elxvro.skytower.ui.ThemePalette
@@ -19,6 +20,7 @@ import com.elxvro.skytower.ui.UiRect
 class BlockSkinsScreen(
     private val kit: SkyVisualKit,
     private val renderer: BlockSkinRenderer,
+    private val stackRenderer: ReferenceStackRenderer,
 ) {
     private val hits = mutableListOf<Pair<UiRect, ScreenAction>>()
 
@@ -28,7 +30,8 @@ class BlockSkinsScreen(
         val s = l.scale
         kit.drawSky(canvas, canvas.width.toFloat(), canvas.height.toFloat())
         val back = l.referenceRect(32f, 42f, 95f, 86f)
-        kit.drawBack(canvas, back.rf()); hits += back to ScreenAction.Back
+        kit.drawBack(canvas, back.rf())
+        hits += back to ScreenAction.Back
         kit.drawCoinCapsule(canvas, l.referenceRect(770f, 44f, 275f, 82f).rf(), progress.coins)
         kit.drawRibbon(canvas, l.referenceRect(200f, 180f, 680f, 125f).rf(), "SKİNLER")
 
@@ -67,15 +70,7 @@ class BlockSkinsScreen(
     fun actionAt(x: Float, y: Float): ScreenAction = hits.lastOrNull { it.first.contains(x, y) }?.second ?: ScreenAction.None
 
     private fun drawSkinTower(canvas: Canvas, area: RectF, themeId: Int, skin: BlockSkin) {
-        val palette = ThemePalette.get(themeId).blocks
-        val blocks = 6
-        val blockH = area.height()/blocks
-        for (i in 0 until blocks) {
-            val inset = (i%2)*area.width()*.025f
-            val bottom = area.bottom-i*blockH
-            val rect = RectF(area.left+inset, bottom-blockH+3f, area.right-inset, bottom)
-            renderer.draw(canvas, rect, palette[i%palette.size], skin)
-        }
+        stackRenderer.drawPreview(canvas, area, ThemePalette.get(themeId).blocks, skin)
     }
 
     private fun skinName(skin: BlockSkin): String = when (skin) {
