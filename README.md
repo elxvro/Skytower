@@ -1,0 +1,70 @@
+# SkyTower
+
+SkyTower, Google Play için geliştirilen çevrimdışı ve tek dokunuşla oynanan 2D kule oyunudur. Hareket eden bloğu kuleye bırak; taşan kısım kesilir, kusursuz hizalamalarda combo artar ve tam kaçırmada oyun biter.
+
+## v0.4 özellikleri
+
+- Tek dokunuşla blok bırakma ve gerçek overlap/kesme matematiği.
+- Daha affedici başlangıç hızı ve kontrollü kademeli zorluk eğrisi.
+- Düşük FPS anlarında 50 ms fizik alt adımlarıyla daha tutarlı blok hareketi.
+- Skor pulse, PERFECT sarsıntısı, combo parçacıkları ve yumuşak kamera/parallax sunumu.
+- İlk oyunda kısa dokunma öğreticisi; tamamlandıktan sonra cihazda hatırlanır.
+- Koşu sonunda skora ve PERFECT sayısına göre coin ödülü.
+- Tek seferlik ve cihazda kalıcı 3 görev: 10 blok, 3 PERFECT, 50 skor.
+- Görev tamamlamalarında ekstra coin ödülü.
+- 3 ücretsiz tema + coin ile açılan Neon, Uzay ve Aurora temaları.
+- Menüde coin bakiyesi, görev ilerlemesi ve sonraki tema kilit/fiyat bilgisi.
+- Oyun sonu ekranında koşu coin'i, görev bonusu ve toplam coin özeti.
+- Coin, görev ilerlemesi, açılan temalar, skor ve ayarlar cihazda kalıcı saklanır.
+- Pause, retry ve ana menü akışları.
+- Ses ve titreşim aç/kapat seçenekleri.
+- İnternet, hesap, reklam ve backend gerektirmez.
+
+## Ekonomi
+
+- Koşu coin'i: `max(1, skor / 5) + PERFECT` (boş koşu 0 coin).
+- 10 blok görevi: 20 coin.
+- 3 PERFECT görevi: 25 coin.
+- 50 skor görevi: 40 coin.
+- Neon: 60 coin.
+- Uzay: 120 coin.
+- Aurora: 200 coin.
+
+## Android yapılandırması
+
+- Package: `com.elxvro.skytower`
+- Version: `0.4.0` (`versionCode 4`)
+- minSdk: 26
+- compileSdk: 36
+- targetSdk: 36
+- Kotlin: 2.2.10
+- Android Gradle Plugin: 8.13.2
+- Gradle: 8.13
+- JDK: 17
+
+Yerel sistemde Gradle 8.13 ve Android SDK 36 kuruluysa:
+
+```bash
+gradle testDebugUnitTest lintDebug assembleDebug
+```
+
+Debug APK: `app/build/outputs/apk/debug/app-debug.apk`
+
+## GitHub Actions
+
+`.github/workflows/android-build.yml` şu adımları çalıştırır:
+
+1. Unit tests
+2. Android lint
+3. Debug APK
+4. Release APK
+5. Release AAB
+
+CI, Java 17 için `actions/setup-java@v5` kullanır. İmzalama sırrı yoksa debug APK kurulabilir test çıktısıdır. Release APK/AAB imzasız üretilir. Google Play için imzalı release oluşturmak üzere GitHub Secrets içine şunlar eklenebilir:
+
+- `SKYTOWER_KEYSTORE_BASE64`
+- `SKYTOWER_KEYSTORE_PASSWORD`
+- `SKYTOWER_KEY_ALIAS`
+- `SKYTOWER_KEY_PASSWORD`
+
+Keystore dosyası veya parolalar hiçbir zaman repoya eklenmemelidir.
