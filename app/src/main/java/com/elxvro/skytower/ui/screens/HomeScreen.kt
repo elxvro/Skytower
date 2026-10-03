@@ -6,6 +6,7 @@ import android.graphics.RectF
 import com.elxvro.skytower.game.LevelRules
 import com.elxvro.skytower.platform.PlayerProgress
 import com.elxvro.skytower.ui.AppScreen
+import com.elxvro.skytower.ui.BlockSkinRenderer
 import com.elxvro.skytower.ui.ReferenceDesignTokens
 import com.elxvro.skytower.ui.ReferenceStackRenderer
 import com.elxvro.skytower.ui.ScreenLayout
@@ -14,7 +15,7 @@ import com.elxvro.skytower.ui.UiRect
 
 class HomeScreen(
     private val kit: SkyVisualKit,
-    private val stackRenderer: ReferenceStackRenderer,
+    private val stackRenderer: ReferenceStackRenderer = ReferenceStackRenderer(BlockSkinRenderer()),
 ) {
     private val hits = mutableListOf<Pair<UiRect, ScreenAction>>()
 
