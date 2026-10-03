@@ -7,11 +7,15 @@ import com.elxvro.skytower.game.LevelRules
 import com.elxvro.skytower.platform.PlayerProgress
 import com.elxvro.skytower.ui.AppScreen
 import com.elxvro.skytower.ui.ReferenceDesignTokens
+import com.elxvro.skytower.ui.ReferenceStackRenderer
 import com.elxvro.skytower.ui.ScreenLayout
 import com.elxvro.skytower.ui.SkyVisualKit
 import com.elxvro.skytower.ui.UiRect
 
-class HomeScreen(private val kit: SkyVisualKit) {
+class HomeScreen(
+    private val kit: SkyVisualKit,
+    private val stackRenderer: ReferenceStackRenderer,
+) {
     private val hits = mutableListOf<Pair<UiRect, ScreenAction>>()
 
     fun draw(canvas: Canvas, progress: PlayerProgress) {
@@ -68,37 +72,15 @@ class HomeScreen(private val kit: SkyVisualKit) {
             hits += rect to ScreenAction.Open(tile.screen)
         }
 
-        kit.drawTitle(canvas, "v0.5 • GELİŞTİRME", canvas.width*.5f, 1685f*s, 22f*s, 0xDDFFFFFF.toInt())
+        kit.drawTitle(canvas, "v0.6 • 2D REFERANS", canvas.width*.5f, 1685f*s, 22f*s, 0xDDFFFFFF.toInt())
     }
 
     fun actionAt(x: Float, y: Float): ScreenAction =
         hits.lastOrNull { it.first.contains(x, y) }?.second ?: ScreenAction.None
 
     private fun drawTowerPreview(canvas: Canvas, l: ScreenLayout) {
-        val s = l.scale
-        val island = l.referenceRect(270f, 560f, 540f, 390f)
-        kit.paint.color = 0xFF6D748A.toInt()
-        canvas.drawOval(RectF(island.left, island.bottom - 95f*s, island.right, island.bottom), kit.paint)
-        kit.paint.color = 0xFF56D367.toInt()
-        canvas.drawRoundRect(RectF(island.left - 10f*s, island.bottom - 108f*s, island.right + 10f*s, island.bottom - 65f*s), 25f*s, 25f*s, kit.paint)
-        val colors = intArrayOf(
-            0xFF2D9EF2.toInt(), 0xFF8B532D.toInt(), 0xFF58C936.toInt(),
-            0xFFFFC62D.toInt(), 0xFFF24C70.toInt(), 0xFFF1EEE9.toInt(),
-        )
-        val baseLeft = island.centerX - 150f*s
-        val baseRight = island.centerX + 150f*s
-        val blockH = 62f*s
-        for (i in 0 until 6) {
-            val bottom = island.bottom - 100f*s - i*blockH
-            val r = RectF(baseLeft + i*3f*s, bottom - blockH + 3f*s, baseRight - i*3f*s, bottom)
-            kit.paint.color = colors[i]
-            canvas.drawRoundRect(r, 12f*s, 12f*s, kit.paint)
-            kit.paint.style = android.graphics.Paint.Style.STROKE
-            kit.paint.strokeWidth = 3f*s
-            kit.paint.color = 0x55294A75
-            canvas.drawRoundRect(r, 12f*s, 12f*s, kit.paint)
-            kit.paint.style = android.graphics.Paint.Style.FILL
-        }
+        val area = l.referenceRect(220f, 520f, 640f, 445f)
+        stackRenderer.drawHome(canvas, area.rf())
     }
 
     private fun drawMenuIcon(canvas: Canvas, rect: UiRect, icon: String, s: Float) {
@@ -120,7 +102,8 @@ class HomeScreen(private val kit: SkyVisualKit) {
                     lineTo(cx+34f*s, cy-5f*s); lineTo(cx+22f*s, cy-12f*s); lineTo(cx+22f*s, cy+42f*s)
                     lineTo(cx-22f*s, cy+42f*s); lineTo(cx-22f*s, cy-12f*s); lineTo(cx-34f*s, cy-5f*s); close()
                 }
-                kit.paint.color = Color.WHITE; canvas.drawPath(p, kit.paint)
+                kit.paint.color = Color.WHITE
+                canvas.drawPath(p, kit.paint)
             }
             else -> {
                 val colors = intArrayOf(0xFF22B8FF.toInt(), 0xFFFFD136.toInt(), 0xFFF2498D.toInt())
