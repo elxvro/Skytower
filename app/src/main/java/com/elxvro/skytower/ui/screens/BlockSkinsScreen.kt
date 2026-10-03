@@ -7,7 +7,6 @@ import android.graphics.RectF
 import com.elxvro.skytower.game.BlockSkin
 import com.elxvro.skytower.game.SkinRules
 import com.elxvro.skytower.platform.PlayerProgress
-import com.elxvro.skytower.ui.BlockSkinRenderer
 import com.elxvro.skytower.ui.InventoryInteractionState
 import com.elxvro.skytower.ui.ItemActionState
 import com.elxvro.skytower.ui.ReferenceDesignTokens
@@ -19,7 +18,6 @@ import com.elxvro.skytower.ui.UiRect
 
 class BlockSkinsScreen(
     private val kit: SkyVisualKit,
-    private val renderer: BlockSkinRenderer,
     private val stackRenderer: ReferenceStackRenderer,
 ) {
     private val hits = mutableListOf<Pair<UiRect, ScreenAction>>()
@@ -53,7 +51,7 @@ class BlockSkinsScreen(
             kit.drawOutlinedTitle(canvas, skinName(skin), card.centerX, card.top+65f*s, 35f*s, Color.WHITE)
 
             val previewArea = RectF(card.left+35f*s, card.top+105f*s, card.right-35f*s, card.top+405f*s)
-            drawSkinTower(canvas, previewArea, progress.themeId, skin)
+            stackRenderer.drawPreview(canvas, previewArea, ThemePalette.get(progress.themeId).blocks, skin)
 
             val button = UiRect(card.left+30f*s, card.bottom-105f*s, card.right-30f*s, card.bottom-25f*s)
             when (InventoryInteractionState.skin(skin, progress.selectedSkin, progress.unlockedSkinMask, progress.coins)) {
@@ -68,10 +66,6 @@ class BlockSkinsScreen(
     }
 
     fun actionAt(x: Float, y: Float): ScreenAction = hits.lastOrNull { it.first.contains(x, y) }?.second ?: ScreenAction.None
-
-    private fun drawSkinTower(canvas: Canvas, area: RectF, themeId: Int, skin: BlockSkin) {
-        stackRenderer.drawPreview(canvas, area, ThemePalette.get(themeId).blocks, skin)
-    }
 
     private fun skinName(skin: BlockSkin): String = when (skin) {
         BlockSkin.CLASSIC -> "KLASİK"
