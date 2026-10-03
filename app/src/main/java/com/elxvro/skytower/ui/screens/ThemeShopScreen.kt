@@ -7,6 +7,7 @@ import android.graphics.RectF
 import android.graphics.Shader
 import com.elxvro.skytower.game.EconomyRules
 import com.elxvro.skytower.platform.PlayerProgress
+import com.elxvro.skytower.ui.BlockSkinRenderer
 import com.elxvro.skytower.ui.ItemActionState
 import com.elxvro.skytower.ui.ReferenceDesignTokens
 import com.elxvro.skytower.ui.ReferenceStackRenderer
@@ -18,7 +19,7 @@ import com.elxvro.skytower.ui.UiRect
 
 class ThemeShopScreen(
     private val kit: SkyVisualKit,
-    private val stackRenderer: ReferenceStackRenderer,
+    private val stackRenderer: ReferenceStackRenderer = ReferenceStackRenderer(BlockSkinRenderer()),
 ) {
     private val hits = mutableListOf<Pair<UiRect, ScreenAction>>()
     private val visibleThemeIds = listOf(0, 1, 2, 5, 4)
