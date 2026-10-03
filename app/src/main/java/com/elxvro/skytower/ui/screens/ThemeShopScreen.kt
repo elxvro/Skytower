@@ -9,23 +9,27 @@ import com.elxvro.skytower.game.EconomyRules
 import com.elxvro.skytower.platform.PlayerProgress
 import com.elxvro.skytower.ui.ItemActionState
 import com.elxvro.skytower.ui.ReferenceDesignTokens
+import com.elxvro.skytower.ui.ReferenceStackRenderer
 import com.elxvro.skytower.ui.ScreenInteractionState
 import com.elxvro.skytower.ui.ScreenLayout
 import com.elxvro.skytower.ui.SkyVisualKit
 import com.elxvro.skytower.ui.ThemePalette
 import com.elxvro.skytower.ui.UiRect
 
-class ThemeShopScreen(private val kit: SkyVisualKit) {
+class ThemeShopScreen(
+    private val kit: SkyVisualKit,
+    private val stackRenderer: ReferenceStackRenderer,
+) {
     private val hits = mutableListOf<Pair<UiRect, ScreenAction>>()
     private val visibleThemeIds = listOf(0, 1, 2, 5, 4)
 
     fun draw(canvas: Canvas, progress: PlayerProgress) {
         hits.clear()
         val l = ScreenLayout(canvas.width.toFloat(), canvas.height.toFloat())
-        val s = l.scale
         kit.drawSky(canvas, canvas.width.toFloat(), canvas.height.toFloat())
         val back = l.referenceRect(32f, 42f, 95f, 86f)
-        kit.drawBack(canvas, back.rf()); hits += back to ScreenAction.Back
+        kit.drawBack(canvas, back.rf())
+        hits += back to ScreenAction.Back
         kit.drawCoinCapsule(canvas, l.referenceRect(770f, 44f, 275f, 82f).rf(), progress.coins)
         kit.drawRibbon(canvas, l.referenceRect(190f, 175f, 700f, 120f).rf(), "TEMALAR")
 
@@ -57,7 +61,6 @@ class ThemeShopScreen(private val kit: SkyVisualKit) {
         wide: Boolean = false,
     ) {
         val s = l.scale
-        val theme = ThemePalette.get(themeId)
         val card = l.referenceRect(x, y, widthRef, heightRef)
         val selected = progress.themeId == themeId || (progress.themeId == 3 && themeId == 0)
         val owned = progress.unlockedThemeMask and (1 shl themeId) != 0
@@ -85,13 +88,12 @@ class ThemeShopScreen(private val kit: SkyVisualKit) {
         }
         drawThemePreview(canvas, preview, themeId)
 
-        if (wide) {
-            val action = UiRect(card.right - 220f*s, card.bottom - 105f*s, card.right - 28f*s, card.bottom - 28f*s)
-            drawAction(canvas, action, progress, themeId, selected, owned)
+        val action = if (wide) {
+            UiRect(card.right - 220f*s, card.bottom - 105f*s, card.right - 28f*s, card.bottom - 28f*s)
         } else {
-            val action = UiRect(card.left + 45f*s, card.bottom - 105f*s, card.right - 45f*s, card.bottom - 25f*s)
-            drawAction(canvas, action, progress, themeId, selected, owned)
+            UiRect(card.left + 45f*s, card.bottom - 105f*s, card.right - 45f*s, card.bottom - 25f*s)
         }
+        drawAction(canvas, action, progress, themeId, selected, owned)
         hits += card to ScreenAction.Theme(themeId)
     }
 
@@ -119,14 +121,13 @@ class ThemeShopScreen(private val kit: SkyVisualKit) {
         kit.paint.color = theme.cloud
         canvas.drawCircle(rect.left+rect.width()*.23f, rect.top+rect.height()*.27f, rect.height()*.10f, kit.paint)
         canvas.drawCircle(rect.left+rect.width()*.78f, rect.top+rect.height()*.22f, rect.height()*.075f, kit.paint)
-        val blockW = rect.width()*.35f
-        val blockH = rect.height()*.115f
-        val left = rect.centerX()-blockW/2f
-        for (i in 0 until 5) {
-            val bottom = rect.bottom-rect.height()*.08f-i*blockH
-            kit.paint.color = theme.blocks[i % theme.blocks.size]
-            canvas.drawRoundRect(RectF(left, bottom-blockH+2f, left+blockW, bottom), blockH*.15f, blockH*.15f, kit.paint)
-        }
+        val stackArea = RectF(
+            rect.left + rect.width() * .20f,
+            rect.top + rect.height() * .31f,
+            rect.right - rect.width() * .20f,
+            rect.bottom - rect.height() * .06f,
+        )
+        stackRenderer.drawPreview(canvas, stackArea, theme.blocks)
     }
 
     private fun displayName(themeId: Int): String = when (themeId) {
