@@ -7,6 +7,7 @@ import android.graphics.RectF
 import com.elxvro.skytower.game.BlockSkin
 import com.elxvro.skytower.game.SkinRules
 import com.elxvro.skytower.platform.PlayerProgress
+import com.elxvro.skytower.ui.BlockSkinRenderer
 import com.elxvro.skytower.ui.InventoryInteractionState
 import com.elxvro.skytower.ui.ItemActionState
 import com.elxvro.skytower.ui.ReferenceDesignTokens
@@ -20,6 +21,8 @@ class BlockSkinsScreen(
     private val kit: SkyVisualKit,
     private val stackRenderer: ReferenceStackRenderer,
 ) {
+    constructor(kit: SkyVisualKit, renderer: BlockSkinRenderer) : this(kit, ReferenceStackRenderer(renderer))
+
     private val hits = mutableListOf<Pair<UiRect, ScreenAction>>()
 
     fun draw(canvas: Canvas, progress: PlayerProgress) {
