@@ -61,7 +61,7 @@ class SettingsScreen(private val kit: SkyVisualKit) {
         val reset = l.referenceRect(250f, 1435f, 580f, 105f)
         kit.drawButton(canvas, reset.rf(), "VERİLERİ SIFIRLA", enabled = false, green = false)
         kit.drawTitle(canvas, "Geliştirme sürümünde kilitli", reset.centerX, reset.bottom + 38f * s, 22f * s, ReferenceDesignTokens.TEXT_MUTED)
-        kit.drawTitle(canvas, "v0.5 • REFERANS TASARIM", canvas.width * .5f, 1665f * s, 23f * s, 0xDDFFFFFF.toInt())
+        kit.drawTitle(canvas, "v0.6 • 2D REFERANS", canvas.width * .5f, 1665f * s, 23f * s, 0xDDFFFFFF.toInt())
     }
 
     fun actionAt(x: Float, y: Float): ScreenAction =
