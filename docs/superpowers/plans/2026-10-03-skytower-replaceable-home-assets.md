@@ -4,7 +4,7 @@
 
 **Goal:** Make the SkyTower Home screen visually replaceable by swapping image files, without changing Kotlin/Canvas code, while preserving all current gameplay data and touch behavior.
 
-**Architecture:** Add one cached asset-loading path (`UiAssetCatalog` + `UiAssetLoader`) and one bitmap drawing helper (`UiBitmapRenderer`). Migrate only `HomeScreen` in this phase: layout/touch rectangles and live text remain code-owned; background, logo, tower/platform, card shells, icons and play-button art become asset-owned with safe Canvas fallbacks.
+**Architecture:** Add one cached asset-loading path (`UiAssetCatalog` + `UiAssetCache` + `UiAssetLoader`) and one bitmap drawing helper (`UiBitmapRenderer`). Migrate only `HomeScreen` in this phase: layout/touch rectangles and live text remain code-owned; background, logo, tower/platform, card shells, icons and play-button art become asset-owned with safe Canvas fallbacks.
 
 **Tech Stack:** Android/Kotlin, SurfaceView/Canvas, `AssetManager`, `BitmapFactory`, JUnit 4, existing GitHub Actions Android build.
 
@@ -24,11 +24,11 @@
 
 ## Review Focus
 
-1. **Corrupt or unreadable asset:** loader returns `null` and Home falls back to current Canvas rendering without a crash; tested in Task 2.
+1. **Corrupt or unreadable asset:** Android decode returns `null` and Home uses the Canvas fallback; build/lint plus runtime seam verify this in Tasks 2 and 5.
 2. **Very tall / very wide device:** center-crop fully covers background and aspect-fit never distorts foreground assets; tested in Task 1.
 3. **Asset with extreme aspect ratio:** destination math stays inside the target rectangle for aspect-fit; tested in Task 1.
-4. **Repeated frame rendering:** same asset path is decoded once and served from cache; tested in Task 2.
-5. **Visual replacement changing taps:** Home menu/play/daily hit rectangles remain numerically identical to the current 1080x1920 geometry; tested in Task 3.
+4. **Repeated frame rendering:** same asset path is decoded once and served from cache; pure cache behavior tested in Task 2.
+5. **Visual replacement changing taps:** Home menu/play/daily hit rectangles remain numerically identical to current 1080x1920 geometry; tested in Task 3.
 
 ---
 
@@ -36,13 +36,16 @@
 
 **Create**
 - `app/src/main/java/com/elxvro/skytower/ui/assets/UiAssetCatalog.kt` — canonical stable asset keys/paths.
-- `app/src/main/java/com/elxvro/skytower/ui/assets/UiAssetLoader.kt` — cached asset decode and safe missing/invalid handling.
+- `app/src/main/java/com/elxvro/skytower/ui/assets/UiAssetCache.kt` — pure generic positive/negative cache.
+- `app/src/main/java/com/elxvro/skytower/ui/assets/UiAssetLoader.kt` — Android bitmap decode adapter backed by the cache.
 - `app/src/main/java/com/elxvro/skytower/ui/assets/UiBitmapRenderer.kt` — center-crop/aspect-fit math and Canvas bitmap drawing.
 - `app/src/main/java/com/elxvro/skytower/ui/assets/HomeAssetLayout.kt` — current Home reference rectangles/touch geometry in one pure layout contract.
+- `app/src/main/java/com/elxvro/skytower/ui/assets/HomeAssetSlots.kt` — pure slot-to-path mapping.
 - `app/src/test/java/com/elxvro/skytower/ui/assets/UiAssetCatalogTest.kt`
 - `app/src/test/java/com/elxvro/skytower/ui/assets/UiBitmapRendererMathTest.kt`
-- `app/src/test/java/com/elxvro/skytower/ui/assets/UiAssetLoaderTest.kt`
+- `app/src/test/java/com/elxvro/skytower/ui/assets/UiAssetCacheTest.kt`
 - `app/src/test/java/com/elxvro/skytower/ui/assets/HomeAssetLayoutTest.kt`
+- `app/src/test/java/com/elxvro/skytower/ui/assets/HomeAssetSlotsTest.kt`
 - `app/src/main/assets/ui/home/*` — starter replaceable Home images.
 - `app/src/main/assets/ui/icons/*` — starter replaceable common Home icons.
 - `docs/visual-assets/SkyTower-Home-Asset-Guide.md` — filename, size and replacement guide for the user.
@@ -66,93 +69,87 @@
 - Produces: `object UiAssetCatalog` with exact string paths for all Home assets.
 - Produces: `data class SourceSize(val width: Float, val height: Float)`.
 - Produces: `data class FloatRect(val left: Float, val top: Float, val right: Float, val bottom: Float)`.
-- Produces: `UiBitmapRenderer.aspectFit(source: SourceSize, target: FloatRect): FloatRect`.
-- Produces: `UiBitmapRenderer.centerCropSource(source: SourceSize, target: FloatRect): FloatRect`.
+- Produces: `UiBitmapRenderer.aspectFit(source: SourceSize, target: FloatRect): FloatRect?`.
+- Produces: `UiBitmapRenderer.centerCropSource(source: SourceSize, target: FloatRect): FloatRect?`.
 
 - [ ] **Step 1: Write failing catalog tests**
 
-Assert exact paths including:
-- `HOME_BACKGROUND == "ui/home/background.webp"`
-- `HOME_LOGO == "ui/home/logo.webp"`
-- `HOME_TOWER_PLATFORM == "ui/home/tower_platform.webp"`
-- `HOME_BUTTON_PLAY == "ui/home/button_play.webp"`
-- card paths for daily, best-score, themes, tasks, level, skins, powerups, settings.
-- icon paths for coin, crown, gift, trophy, themes, tasks, level, skins, powerups, settings.
+Assert exact paths including `ui/home/background.webp`, `logo.webp`, `tower_platform.webp`, `button_play.webp`, all eight Home card paths and all required icon paths.
 
 - [ ] **Step 2: Write failing geometry tests**
 
-Tests must assert:
-- 1000x500 source aspect-fit into 300x300 target yields 300x150 centered vertically.
+Assert:
+- 1000x500 source aspect-fit into 300x300 yields 300x150 centered vertically.
 - 500x1000 source aspect-fit into 300x300 yields 150x300 centered horizontally.
-- 1000x500 source center-crop into 300x600 selects a source rectangle that has target aspect ratio and stays within source bounds.
-- zero/non-positive source dimensions return no drawable rectangle rather than dividing by zero.
+- 1000x500 source center-crop into 300x600 selects a source rectangle with target aspect ratio and within source bounds.
+- zero/non-positive source dimensions return `null` rather than divide by zero.
 
 - [ ] **Step 3: Run tests and verify RED**
 
-Run:
-`gradle --no-daemon :app:testDebugUnitTest --tests 'com.elxvro.skytower.ui.assets.*'`
+Run: `gradle --no-daemon :app:testDebugUnitTest --tests 'com.elxvro.skytower.ui.assets.*'`
 
-Expected: FAIL because the new catalog/math types do not exist.
+Expected: FAIL because catalog/math types do not exist.
 
 - [ ] **Step 4: Implement minimal catalog and pure math**
 
-Implement only the signatures above plus Canvas draw helpers:
-- `drawAspectFit(canvas: Canvas, bitmap: Bitmap, target: RectF, paint: Paint? = null)`
-- `drawCenterCrop(canvas: Canvas, bitmap: Bitmap, target: RectF, paint: Paint? = null)`
-
-No file decoding in this class.
+Add Canvas helpers `drawAspectFit(canvas, bitmap, target, paint)` and `drawCenterCrop(canvas, bitmap, target, paint)`. No file decoding in this class.
 
 - [ ] **Step 5: Run tests and verify GREEN**
 
-Same command; expected all new Task 1 tests PASS.
+Same command; expected Task 1 tests PASS.
 
 - [ ] **Step 6: Commit**
 
-Commit message: `feat: add replaceable UI asset catalog and scaling math`
+Commit: `feat: add replaceable UI asset catalog and scaling math`
 
 ---
 
-### Task 2: Cached, failure-safe asset loader
+### Task 2: Cached, failure-safe asset loading
 
 **Files:**
+- Create: `app/src/main/java/com/elxvro/skytower/ui/assets/UiAssetCache.kt`
 - Create: `app/src/main/java/com/elxvro/skytower/ui/assets/UiAssetLoader.kt`
-- Test: `app/src/test/java/com/elxvro/skytower/ui/assets/UiAssetLoaderTest.kt`
+- Test: `app/src/test/java/com/elxvro/skytower/ui/assets/UiAssetCacheTest.kt`
 
 **Interfaces:**
-- Consumes: stable string paths from `UiAssetCatalog`.
-- Produces: `interface UiAssetSource { fun decode(path: String): Bitmap? }`.
-- Produces: `class AndroidUiAssetSource(assetManager: AssetManager) : UiAssetSource`.
-- Produces: `class UiAssetLoader(source: UiAssetSource)`.
-- Produces: `fun bitmap(path: String): Bitmap?`.
-- Produces: `fun clear()`.
+- Produces: `class UiAssetCache<T : Any>(private val decoder: (String) -> T?)`.
+- Produces: `fun get(path: String): T?` and `fun clear()`.
+- Produces: `class UiAssetLoader(assetManager: AssetManager)`.
+- Produces: `fun bitmap(path: String): Bitmap?` and `fun clear()`.
+- `UiAssetLoader` composes `UiAssetCache<Bitmap>` and owns Android decoding only.
 
-- [ ] **Step 1: Write failing cache/failure tests**
+- [ ] **Step 1: Write failing pure cache tests**
 
-Using a fake `UiAssetSource`, assert:
-- first `bitmap(path)` decodes once;
-- repeated `bitmap(path)` returns cached instance without another decode;
-- missing path returns `null` and is negative-cached so it is not decoded every frame;
-- source exception is caught and exposed as `null`;
-- `clear()` empties positive and negative cache so a later request decodes again.
+Use `UiAssetCache<String>` and assert:
+- first `get(path)` decodes once;
+- repeated request returns cached value without another decode;
+- missing path (`decoder -> null`) is negative-cached;
+- decoder exception is caught and exposed as `null`;
+- `clear()` removes positive and negative cache so a later request decodes again.
 
-- [ ] **Step 2: Run loader test and verify RED**
+- [ ] **Step 2: Run cache test and verify RED**
 
-Run:
-`gradle --no-daemon :app:testDebugUnitTest --tests 'com.elxvro.skytower.ui.assets.UiAssetLoaderTest'`
+Run: `gradle --no-daemon :app:testDebugUnitTest --tests 'com.elxvro.skytower.ui.assets.UiAssetCacheTest'`
 
-Expected: FAIL because loader/source classes do not exist.
+Expected: FAIL because cache class does not exist.
 
-- [ ] **Step 3: Implement minimal loader**
+- [ ] **Step 3: Implement minimal pure cache**
 
-`AndroidUiAssetSource.decode(path)` opens via `AssetManager.open(path)`, decodes with `BitmapFactory.decodeStream`, closes the stream, and returns `null` for missing/corrupt assets. `UiAssetLoader` owns cache policy only.
+Use one map for successful values and one set for known misses. Decoder exceptions count as misses.
 
-- [ ] **Step 4: Run loader test and verify GREEN**
+- [ ] **Step 4: Implement Android adapter**
 
-Same command; expected PASS.
+`UiAssetLoader` opens via `AssetManager.open(path)`, decodes with `BitmapFactory.decodeStream`, closes the stream, and returns `null` for missing/corrupt assets. Do not add Robolectric or mocking libraries.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Run cache tests plus Android compile/lint**
 
-Commit message: `feat: add cached UI asset loader`
+Run: `gradle --no-daemon :app:testDebugUnitTest :app:lintDebug :app:assembleDebug`
+
+Expected: pure cache tests PASS and Android adapter compiles/lints.
+
+- [ ] **Step 6: Commit**
+
+Commit: `feat: add cached UI asset loader`
 
 ---
 
@@ -164,152 +161,142 @@ Commit message: `feat: add cached UI asset loader`
 - Modify: `app/src/main/java/com/elxvro/skytower/ui/screens/HomeScreen.kt`
 
 **Interfaces:**
-- Consumes: existing 1080x1920 `ScreenLayout` scaling convention.
-- Produces: pure reference rectangles for `daily`, `best`, `tower`, `play`, and six menu tiles.
-- Produces: `fun menuTile(index: Int): FloatRect` with exactly 6 valid indices.
+- Produces pure reference rectangles for daily, best, tower, play, and six menu tiles.
+- Produces `fun menuTile(index: Int): FloatRect?`.
 
 - [ ] **Step 1: Write failing reference-geometry test**
 
-Pin current Home reference values exactly:
+Pin current Home values exactly:
 - daily `(45,330,235,170)`
 - best `(800,330,235,170)`
 - tower `(220,520,640,445)`
 - play `(205,1035,670,155)`
-- menu tile 0 `(58,1230,300,170)`
-- horizontal tile stride `338`
-- vertical tile stride `205`
-- six tiles total.
+- tile 0 `(58,1230,300,170)`
+- horizontal stride `338`
+- vertical stride `205`
+- exactly six tiles; invalid indices return `null`.
 
-Also assert invalid menu indices return `null` rather than creating an off-screen hit target.
+- [ ] **Step 2: Run and verify RED**
 
-- [ ] **Step 2: Run geometry test and verify RED**
+Run: `gradle --no-daemon :app:testDebugUnitTest --tests 'com.elxvro.skytower.ui.assets.HomeAssetLayoutTest'`
 
-Run:
-`gradle --no-daemon :app:testDebugUnitTest --tests 'com.elxvro.skytower.ui.assets.HomeAssetLayoutTest'`
+- [ ] **Step 3: Implement layout and make HomeScreen consume it**
 
-Expected: FAIL because `HomeAssetLayout` does not exist.
+Move only rectangle definitions; do not change destinations or `ScreenAction` mappings.
 
-- [ ] **Step 3: Implement `HomeAssetLayout` and make HomeScreen consume it**
+- [ ] **Step 4: Run all unit tests**
 
-Move only rectangle definitions; do not change current destinations or `ScreenAction` mappings.
+Run: `gradle --no-daemon :app:testDebugUnitTest`
 
-- [ ] **Step 4: Run all unit tests and verify GREEN**
-
-Run:
-`gradle --no-daemon :app:testDebugUnitTest`
-
-Expected: all existing and new tests PASS.
+Expected: all tests PASS.
 
 - [ ] **Step 5: Commit**
 
-Commit message: `refactor: freeze Home visual and touch geometry`
+Commit: `refactor: freeze Home visual and touch geometry`
 
 ---
 
-### Task 4: Add the user-replaceable Home asset pack and guide
+### Task 4: Add user-replaceable Home asset pack and guide
 
 **Files:**
-- Create binary starter files under `app/src/main/assets/ui/home/` and `app/src/main/assets/ui/icons/` using the exact catalog names.
+- Create binary starter files under `app/src/main/assets/ui/home/` and `app/src/main/assets/ui/icons/` using exact catalog names.
 - Create: `docs/visual-assets/SkyTower-Home-Asset-Guide.md`
 
 **Interfaces:**
-- Consumes: exact paths from `UiAssetCatalog`.
-- Produces: files the user can replace without Kotlin changes.
+- Produces files the user can replace without Kotlin changes.
 
-- [ ] **Step 1: Add starter asset files with exact stable names**
+- [ ] **Step 1: Add valid starter assets**
 
-Required Home filenames:
-- `background.webp` — recommended 1080x1920.
-- `logo.webp` — recommended 760x320 transparent.
-- `tower_platform.webp` — recommended 700x260 transparent.
-- `button_play.webp` — recommended 680x180.
-- `card_daily.webp`, `card_best_score.webp` — recommended 360x240.
-- six menu cards — recommended 320x210 each.
+Required Home files:
+- `background.webp` — 1080x1920 recommended.
+- `logo.webp` — 760x320 transparent recommended.
+- `tower_platform.webp` — 700x260 transparent recommended.
+- `button_play.webp` — 680x180 recommended.
+- `card_daily.webp`, `card_best_score.webp` — 360x240 recommended.
+- `card_themes.webp`, `card_tasks.webp`, `card_level.webp`, `card_skins.webp`, `card_powerups.webp`, `card_settings.webp` — 320x210 recommended.
 
-Required icon filenames are the exact paths in Task 1; recommended 256x256 transparent.
+Required icons use exact Task 1 paths; 256x256 transparent recommended.
 
-Starter files may be neutral placeholders because the user will choose final art, but they must be valid decodable WebP/PNG content and visually safe if not replaced.
+Starter files must be valid decodable assets and visually safe. They are not the final art direction; the user will replace them.
 
-- [ ] **Step 2: Write the user guide**
+- [ ] **Step 2: Write user guide**
 
-Document for every asset:
-- exact filename;
-- recommended source size;
-- transparency expectation;
-- whether text should be baked in (default: no for dynamic content);
-- safe area for `background.webp` (central 900x1680 of 1080x1920);
-- replacement workflow: replace file, keep name, commit/push, rebuild APK.
+For every asset document exact filename, recommended size, transparency, whether text should be baked in (default: no for dynamic content), background safe area (central 900x1680), and replacement workflow.
 
-Include a compact table the user can follow without reading Kotlin.
-
-- [ ] **Step 3: Verify package visibility**
+- [ ] **Step 3: Verify packaged paths, not only compilation**
 
 Run:
 `gradle --no-daemon :app:assembleDebug`
 
-Expected: build succeeds and generated APK contains `assets/ui/home/` and `assets/ui/icons/` entries.
+Then:
+`unzip -l app/build/outputs/apk/debug/app-debug.apk | grep 'assets/ui/home/background.webp'`
+`unzip -l app/build/outputs/apk/debug/app-debug.apk | grep 'assets/ui/icons/'`
+
+Expected: required asset paths are present inside APK.
 
 - [ ] **Step 4: Commit**
 
-Commit message: `assets: add replaceable Home visual pack and guide`
+Commit: `assets: add replaceable Home visual pack and guide`
 
 ---
 
 ### Task 5: Migrate Home rendering to assets with Canvas fallbacks
 
 **Files:**
+- Create: `app/src/main/java/com/elxvro/skytower/ui/assets/HomeAssetSlots.kt`
+- Test: `app/src/test/java/com/elxvro/skytower/ui/assets/HomeAssetSlotsTest.kt`
 - Modify: `app/src/main/java/com/elxvro/skytower/ui/screens/HomeScreen.kt`
 - Modify: `app/src/main/java/com/elxvro/skytower/ui/SkyTowerV05View.kt`
 - Modify: `README.md`
 
 **Interfaces:**
-- Consumes: `UiAssetLoader.bitmap(path)`, `UiBitmapRenderer`, `HomeAssetLayout` and catalog keys.
+- Consumes `UiAssetLoader.bitmap(path)`, `UiBitmapRenderer`, `HomeAssetLayout` and catalog keys.
+- `HomeAssetSlots` maps each replaceable Home visual slot to exactly one asset path; dynamic values have no image slot.
 - HomeScreen constructor becomes `HomeScreen(kit: SkyVisualKit, assets: UiAssetLoader, bitmapRenderer: UiBitmapRenderer = UiBitmapRenderer(), stackRenderer: ReferenceStackRenderer = ...)`.
-- `SkyTowerV05View` creates exactly one `UiAssetLoader(AndroidUiAssetSource(context.assets))` and injects it into HomeScreen.
+- `SkyTowerV05View` creates exactly one `UiAssetLoader(context.assets)` and injects it into Home.
 - `release()` calls `uiAssets.clear()`.
 
-- [ ] **Step 1: Add a Home asset-selection unit seam**
+- [ ] **Step 1: Write failing slot mapping test**
 
-Extract a pure helper/state decision that maps each Home visual slot to its catalog path and fallback identity. Test that all required slots map to exactly one stable asset path and no dynamic value is represented as an image slot.
+Assert every Home replaceable visual maps to exactly one stable catalog path, and coin count / score / level / XP are absent from slots.
 
-- [ ] **Step 2: Run the new mapping test and verify RED**
+- [ ] **Step 2: Run and verify RED**
 
-Expected: FAIL before the helper exists.
+Run: `gradle --no-daemon :app:testDebugUnitTest --tests 'com.elxvro.skytower.ui.assets.HomeAssetSlotsTest'`
 
-- [ ] **Step 3: Migrate background/logo/tower/play drawing**
+- [ ] **Step 3: Implement slot mapping**
 
-For each slot:
-- if bitmap exists, draw via the correct aspect rule;
-- otherwise execute the existing Canvas fallback (`drawSky`, `drawLogo`, `ReferenceStackRenderer`, `drawButton`).
+No rendering logic in this pure file.
 
-Do not move any rectangles.
+- [ ] **Step 4: Migrate background/logo/tower/play drawing**
 
-- [ ] **Step 4: Migrate cards and icons**
+If asset exists, draw with correct aspect rule; otherwise run existing Canvas fallback (`drawSky`, `drawLogo`, `ReferenceStackRenderer`, `drawButton`). Do not move rectangles.
 
-Card shell and icon use assets when available. Keep labels, coin/score/level values and state text code-rendered on top. If a card/icon bitmap is missing, retain current Canvas drawing.
+- [ ] **Step 5: Migrate cards and icons**
 
-- [ ] **Step 5: Wire one shared loader in `SkyTowerV05View`**
+Asset owns shell/icon appearance; labels and all live values remain code-rendered on top. Missing asset uses existing Canvas fallback.
 
-Ensure no loader is created per frame or per draw call; clear cache only on `release()`.
+- [ ] **Step 6: Wire one loader in SkyTowerV05View**
 
-- [ ] **Step 6: Run complete local verification**
+No per-frame/per-draw loader creation. Clear cache only on `release()`.
 
-Run:
-`gradle --no-daemon testDebugUnitTest lintDebug assembleDebug assembleRelease bundleRelease`
+- [ ] **Step 7: Run complete verification**
 
-Expected: exit 0; unit tests pass, lint has no blocking errors, debug APK/release APK/release AAB are produced.
+Run: `gradle --no-daemon testDebugUnitTest lintDebug assembleDebug assembleRelease bundleRelease`
 
-- [ ] **Step 7: Verify swap behavior**
+Expected: exit 0 and all artifacts produced.
 
-Temporarily replace `ui/home/background.webp` with a clearly different test bitmap, rebuild debug APK, confirm no Kotlin source changes are needed and the APK packages the changed asset; restore the starter background afterward.
+- [ ] **Step 8: Prove art swap requires no Kotlin change**
 
-- [ ] **Step 8: Update README**
+Replace only `ui/home/background.webp` with a clearly different test bitmap, rebuild, confirm `git diff -- '*.kt'` is empty and packaged `background.webp` hash changes; restore starter asset afterward.
 
-Add one short “Changing visuals” section linking `docs/visual-assets/SkyTower-Home-Asset-Guide.md`.
+- [ ] **Step 9: Update README**
 
-- [ ] **Step 9: Commit**
+Add a short “Changing visuals” section linking `docs/visual-assets/SkyTower-Home-Asset-Guide.md`.
 
-Commit message: `feat: make SkyTower Home visuals user replaceable`
+- [ ] **Step 10: Commit**
+
+Commit: `feat: make SkyTower Home visuals user replaceable`
 
 ---
 
@@ -322,18 +309,18 @@ Commit message: `feat: make SkyTower Home visuals user replaceable`
 - Consumes final feature-branch HEAD.
 - Produces verified development APK/artifact; does not merge PR.
 
-- [ ] **Step 1: Push/commit final HEAD and read the GitHub Actions run for that exact SHA**
+- [ ] **Step 1: Read GitHub Actions run for exact final SHA**
 
-Required workflow command remains:
+Workflow command remains:
 `gradle --no-daemon --stacktrace testDebugUnitTest lintDebug assembleDebug assembleRelease bundleRelease`
 
-- [ ] **Step 2: Require all build steps green**
+- [ ] **Step 2: Require every relevant step green**
 
-Verify unit tests, lint, debug APK, release APK, release AAB, artifact collection and artifact upload all conclude `success`.
+Unit tests, lint, debug APK, release APK, release AAB, artifact collection and upload must conclude `success`.
 
 - [ ] **Step 3: Download artifact and verify archive integrity**
 
-Verify ZIP opens without errors and debug APK is present/installable-format.
+ZIP must open without errors and include the debug APK plus Home asset paths.
 
 - [ ] **Step 4: Do not merge PR**
 
