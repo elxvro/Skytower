@@ -14,11 +14,12 @@ import com.elxvro.skytower.ui.SkyVisualKit
 import com.elxvro.skytower.ui.UiRect
 import com.elxvro.skytower.ui.assets.UiAssetCatalog
 import com.elxvro.skytower.ui.assets.UiAssetLoader
+import com.elxvro.skytower.ui.assets.UiAssetRuntime
 import com.elxvro.skytower.ui.assets.UiBitmapRenderer
 
 class HomeScreen(
     private val kit: SkyVisualKit,
-    private val assets: UiAssetLoader? = null,
+    private val assets: UiAssetLoader? = UiAssetRuntime.loader,
     private val bitmapRenderer: UiBitmapRenderer = UiBitmapRenderer(),
     private val stackRenderer: ReferenceStackRenderer = ReferenceStackRenderer(BlockSkinRenderer()),
 ) {
